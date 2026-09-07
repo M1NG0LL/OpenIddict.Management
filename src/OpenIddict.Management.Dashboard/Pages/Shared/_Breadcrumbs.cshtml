@@ -1,0 +1,24 @@
+@using OpenIddict.Management.Dashboard
+@inject Microsoft.Extensions.Options.IOptions<DashboardOptions> Options
+@{
+    var prefix = Options.Value.PathPrefix.TrimEnd('/');
+    var pageName = ViewData["Title"] as string ?? "Dashboard";
+}
+<nav class="breadcrumbs" aria-label="Breadcrumb navigation">
+    <a href="@prefix" style="display: flex; align-items: center; gap: 0.35rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        <span>Home</span>
+    </a>
+    @if (!string.Equals(pageName, "Overview", StringComparison.OrdinalIgnoreCase) && !string.Equals(pageName, "Dashboard", StringComparison.OrdinalIgnoreCase))
+    {
+        <span class="breadcrumbs-separator">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        </span>
+        <span class="breadcrumbs-current">@pageName</span>
+    }
+</nav>

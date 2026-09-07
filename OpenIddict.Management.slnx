@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OpenIddict.Management.Core/OpenIddict.Management.Core.csproj" />
+    <Project Path="src/OpenIddict.Management.Storage.EfCore/OpenIddict.Management.Storage.EfCore.csproj" />
+    <Project Path="src/OpenIddict.Management.Endpoints/OpenIddict.Management.Endpoints.csproj" />
+    <Project Path="src/OpenIddict.Management.Dashboard/OpenIddict.Management.Dashboard.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OpenIddict.Management.Core.Tests/OpenIddict.Management.Core.Tests.csproj" />
+    <Project Path="tests/OpenIddict.Management.Storage.EfCore.Tests/OpenIddict.Management.Storage.EfCore.Tests.csproj" />
+    <Project Path="tests/OpenIddict.Management.Endpoints.Tests/OpenIddict.Management.Endpoints.Tests.csproj" />
+    <Project Path="tests/OpenIddict.Management.Dashboard.Tests/OpenIddict.Management.Dashboard.Tests.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Sample.MvcApp/Sample.MvcApp.csproj" />
+    <Project Path="samples/Sample.MinimalApi/Sample.MinimalApi.csproj" />
+  </Folder>
+</Solution>

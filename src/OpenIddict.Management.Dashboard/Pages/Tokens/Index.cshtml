@@ -1,0 +1,457 @@
+@page
+@model OpenIddict.Management.Dashboard.Pages.Tokens.IndexModel
+@{
+    ViewData["Title"] = "Token Inspector";
+    var prefix = DashboardOptions.Value.PathPrefix.TrimEnd('/');
+    
+    int activeFilterCount = 0;
+    if (!string.IsNullOrWhiteSpace(Model.SearchTerm)) activeFilterCount++;
+    if (!string.IsNullOrWhiteSpace(Model.UserId)) activeFilterCount++;
+    if (!string.IsNullOrWhiteSpace(Model.ClientId)) activeFilterCount++;
+    if (Model.CreatedFrom.HasValue) activeFilterCount++;
+    if (Model.CreatedTo.HasValue) activeFilterCount++;
+    if (!string.IsNullOrWhiteSpace(Model.Status)) activeFilterCount++;
+    if (!string.IsNullOrWhiteSpace(Model.TokenType)) activeFilterCount++;
+
+    bool hasActiveFilters = activeFilterCount > 0;
+
+    string FormatExpiry(DateTimeOffset? expiry)
+    {
+        if (!expiry.HasValue) return "Never";
+        var now = DateTimeOffset.UtcNow;
+        var diff = expiry.Value - now;
+        if (diff.TotalSeconds <= 0)
+        {
+            var ago = now - expiry.Value;
+            if (ago.TotalDays >= 1) return $"Expired {(int)ago.TotalDays}d ago";
+            if (ago.TotalHours >= 1) return $"Expired {(int)ago.TotalHours}h ago";
+            return $"Expired {(int)ago.TotalMinutes}m ago";
+        }
+        if (diff.TotalDays >= 1) return $"in {(int)diff.TotalDays}d {(int)diff.Hours}h";
+        if (diff.TotalHours >= 1) return $"in {(int)diff.TotalHours}h {(int)diff.Minutes}m";
+        return $"in {(int)diff.TotalMinutes}m";
+    }
+
+    string GetTokenTypeBadge(string? type) => type?.ToLowerInvariant() switch
+    {
+        "access_token" => "token-badge-access",
+        "refresh_token" => "token-badge-refresh",
+        "authorization_code" => "token-badge-authcode",
+        "device_code" => "token-badge-device",
+        _ => "badge-secondary"
+    };
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Token Inspector & Revocation</h1>
+        <p class="page-subtitle">Search, inspect, and revoke tokens with advanced multi-criteria filtering and diagnostics.</p>
+    </div>
+    <div style="display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap;">
+        <button type="button" class="btn btn-secondary" onclick="openModal('modal-revoke-user')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            Revoke by User
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="openModal('modal-revoke-client')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+            Revoke by Client
+        </button>
+        <form method="post" asp-page-handler="RevokeFiltered" id="revoke-filtered-form" style="display:inline;">
+            <input type="hidden" name="SearchTerm" value="@Model.SearchTerm" />
+            <input type="hidden" name="UserId" value="@Model.UserId" />
+            <input type="hidden" name="ClientId" value="@Model.ClientId" />
+            <input type="hidden" name="CreatedFrom" value="@Model.CreatedFrom?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="CreatedTo" value="@Model.CreatedTo?.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="Status" value="@Model.Status" />
+            <input type="hidden" name="TokenType" value="@Model.TokenType" />
+            <button type="button" class="btn btn-danger" onclick="openConfirmModal('Revoke Filtered Tokens', 'Revoke ALL tokens matching the currently applied filters? This will immediately invalidate access for those tokens.', () => document.getElementById('revoke-filtered-form').submit())">
+                Revoke Filtered Tokens
+            </button>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Message))
+{
+    <div class="server-toast-data" data-message="@Model.Message" data-type="@(Model.IsSuccess ? "success" : "danger")" data-title="@(Model.IsSuccess ? "Success!" : "Revocation Failed")" style="display:none;"></div>
+}
+
+<div class="metrics-grid" style="margin-bottom: 1.5rem;">
+    <div class="metric-card metric-tokens">
+        <div class="metric-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+            </svg>
+        </div>
+        <div>
+            <div class="metric-value">@Model.TokenCounts.Total</div>
+            <div class="metric-label">All Tokens</div>
+        </div>
+    </div>
+
+    <div class="metric-card metric-apps">
+        <div class="metric-icon-wrapper" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+        </div>
+        <div>
+            <div class="metric-value" style="color: var(--success-color, #10b981);">@Model.TokenCounts.Valid</div>
+            <div class="metric-label">Valid Tokens</div>
+        </div>
+    </div>
+
+    <div class="metric-card metric-scopes">
+        <div class="metric-icon-wrapper" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+        </div>
+        <div>
+            <div class="metric-value" style="color: var(--warning-color, #f59e0b);">@Model.TokenCounts.Expired</div>
+            <div class="metric-label">Expired Tokens</div>
+        </div>
+    </div>
+
+    <div class="metric-card metric-sessions">
+        <div class="metric-icon-wrapper" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
+            </svg>
+        </div>
+        <div>
+            <div class="metric-value" style="color: var(--danger-color, #ef4444);">@Model.TokenCounts.Revoked</div>
+            <div class="metric-label">Revoked Tokens</div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header" style="cursor: pointer; user-select: none;" onclick="toggleFilterPanel()">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <h2 class="card-title" style="font-size: 1rem;">Filter & Search Tokens</h2>
+            @if (hasActiveFilters)
+            {
+                <span class="badge badge-info">@activeFilterCount active</span>
+            }
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.85rem;">
+            <span id="filter-toggle-text">@(hasActiveFilters ? "Hide Filters" : "Show Filters")</span>
+            <svg id="filter-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform var(--transition-fast);">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+        </div>
+    </div>
+    <div id="filter-panel" class="collapsible-filter-panel @(hasActiveFilters ? "expanded" : "")">
+        <div class="card-body">
+            <form method="get" class="filter-bar" style="flex-direction: column; align-items: stretch; gap: 1rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div>
+                        <label class="form-label" for="search-term">Keyword Search</label>
+                        <input type="text" id="search-term" name="SearchTerm" class="form-control" placeholder="Search ID, Subject, Client..." value="@Model.SearchTerm" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="client-id">Client ID</label>
+                        <input type="text" id="client-id" name="ClientId" class="form-control" placeholder="Filter by Client ID..." value="@Model.ClientId" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="user-id">User ID (Subject)</label>
+                        <input type="text" id="user-id" name="UserId" class="form-control" placeholder="Filter by User ID..." value="@Model.UserId" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="status">Status</label>
+                        <select id="status" name="Status" class="form-select">
+                            <option value="">All Statuses</option>
+                            <option value="active" selected="@(string.Equals(Model.Status, "active", StringComparison.OrdinalIgnoreCase))">Active / Valid</option>
+                            <option value="revoked" selected="@(string.Equals(Model.Status, "revoked", StringComparison.OrdinalIgnoreCase))">Revoked</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: flex-end;">
+                    <div>
+                        <label class="form-label" for="created-from">Created From (Date)</label>
+                        <input type="date" id="created-from" name="CreatedFrom" class="form-control" value="@Model.CreatedFrom?.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="created-to">Created To (Date)</label>
+                        <input type="date" id="created-to" name="CreatedTo" class="form-control" value="@Model.CreatedTo?.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="token-type">Token Type</label>
+                        <select id="token-type" name="TokenType" class="form-select">
+                            <option value="">All Types</option>
+                            <option value="access_token" selected="@(string.Equals(Model.TokenType, "access_token", StringComparison.OrdinalIgnoreCase))">Access Token</option>
+                            <option value="refresh_token" selected="@(string.Equals(Model.TokenType, "refresh_token", StringComparison.OrdinalIgnoreCase))">Refresh Token</option>
+                            <option value="authorization_code" selected="@(string.Equals(Model.TokenType, "authorization_code", StringComparison.OrdinalIgnoreCase))">Authorization Code</option>
+                            <option value="device_code" selected="@(string.Equals(Model.TokenType, "device_code", StringComparison.OrdinalIgnoreCase))">Device Code</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">Apply Filters</button>
+                        @if (hasActiveFilters)
+                        {
+                            <a href="@prefix/Tokens" class="btn btn-secondary" style="color: var(--text-muted);">Reset</a>
+                        }
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 class="card-title">Token Records (@Model.Tokens.TotalCount total)</h2>
+        @if (hasActiveFilters)
+        {
+            <span class="badge badge-info">Filtered View</span>
+        }
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Token ID / Ref</th>
+                        <th>Client</th>
+                        <th>Subject (User)</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Expires</th>
+                        <th>Serialized Data</th>
+                        <th style="text-align: right; width: 80px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Tokens.Items.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="9">
+                                <div class="empty-state">
+                                    <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                                    </svg>
+                                    <div class="empty-state-title">No tokens found</div>
+                                    <div class="empty-state-description">No active or historic tokens matched your filter criteria.</div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var token in Model.Tokens.Items)
+                        {
+                            var typeClass = GetTokenTypeBadge(token.Type);
+                            var expiryText = FormatExpiry(token.ExpirationDate);
+
+                            <tr class="token-row-clickable" data-serialized="@(token.SerializedData ?? "")" onclick="if (event.target.closest('.action-dropdown, .dropdown-trigger, .dropdown-menu, .copy-btn, button, a, form')) return; openTokenDrawer({ id: '@token.Id', refId: '@(token.ReferenceId ?? "")', clientId: '@(token.ClientId ?? "")', clientName: '@(token.ClientDisplayName ?? "")', subject: '@(token.Subject ?? "")', type: '@(token.Type ?? "")', isRevoked: @(token.IsRevoked.ToString().ToLowerInvariant()), isExpired: @(token.IsExpired.ToString().ToLowerInvariant()), created: '@(token.CreatedAt?.ToString("u") ?? "")', expires: '@(token.ExpirationDate?.ToString("u") ?? "")', revokedAt: '@(token.RevokedAt?.ToString("u") ?? "")', serializedData: this.getAttribute('data-serialized') })">
+                                <td>
+                                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                        <code title="@token.Id">@(token.Id.Length > 12 ? token.Id[..8] + "..." : token.Id)</code>
+                                        <button type="button" class="copy-btn" onclick="copyToClipboard('@token.Id', event)" title="Copy Token ID">
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                        </button>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(token.ReferenceId))
+                                    {
+                                        <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem; margin-top: 2px;" title="@token.ReferenceId">
+                                            <span>Ref: @(token.ReferenceId.Length > 12 ? token.ReferenceId[..8] + "..." : token.ReferenceId)</span>
+                                            <button type="button" class="copy-btn" onclick="copyToClipboard('@token.ReferenceId', event)" title="Copy Reference ID">
+                                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                            </button>
+                                        </div>
+                                    }
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(token.ClientId))
+                                    {
+                                        <strong>@token.ClientId</strong>
+                                        @if (!string.IsNullOrEmpty(token.ClientDisplayName))
+                                        {
+                                            <div style="font-size: 0.75rem; color: var(--text-muted);">@token.ClientDisplayName</div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span style="color: var(--text-muted);">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(token.Subject))
+                                    {
+                                        <code>@token.Subject</code>
+                                    }
+                                    else
+                                    {
+                                        <span style="color: var(--text-muted);">[Client Credentials]</span>
+                                    }
+                                </td>
+                                <td><span class="badge @typeClass">@(token.Type ?? "token")</span></td>
+                                <td>
+                                    @if (token.IsRevoked)
+                                    {
+                                        <span class="badge badge-danger">
+                                            <span class="status-dot status-dot-danger"></span>
+                                            <span>Revoked</span>
+                                        </span>
+                                    }
+                                    else if (token.IsExpired)
+                                    {
+                                        <span class="badge badge-warning">
+                                            <span class="status-dot status-dot-warning"></span>
+                                            <span>Expired</span>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-success">
+                                            <span class="status-dot status-dot-active"></span>
+                                            <span>Valid</span>
+                                        </span>
+                                    }
+                                </td>
+                                <td><span style="color: var(--text-secondary); font-size: 0.85rem;">@(token.CreatedAt?.ToString("g") ?? "-")</span></td>
+                                <td>
+                                    <span title="@(token.ExpirationDate?.ToString("g") ?? "Never")" style="font-size: 0.85rem;">@expiryText</span>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(token.SerializedData))
+                                    {
+                                        var displayData = token.SerializedData.Length > 20
+                                            ? token.SerializedData[..20] + "..."
+                                            : token.SerializedData;
+                                        <div style="display: flex; align-items: center; gap: 0.35rem;" title="@token.SerializedData">
+                                            <code style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;">@displayData</code>
+                                            <button type="button" class="copy-btn" data-copy="@token.SerializedData" onclick="copyToClipboard(this.getAttribute('data-copy'), event)" title="Copy Serialized Data">
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span style="color: var(--text-muted);">-</span>
+                                    }
+                                </td>
+                                <td style="text-align: right;">
+                                    <div class="action-dropdown">
+                                        <button type="button" class="dropdown-trigger" aria-label="More actions" onclick="toggleDropdown(this, event)">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="1"></circle>
+                                                <circle cx="12" cy="5" r="1"></circle>
+                                                <circle cx="12" cy="19" r="1"></circle>
+                                            </svg>
+                                        </button>
+                                        <div class="dropdown-menu">
+                                            <button type="button" class="dropdown-item" onclick="openTokenDrawer({ id: '@token.Id', refId: '@(token.ReferenceId ?? "")', clientId: '@(token.ClientId ?? "")', clientName: '@(token.ClientDisplayName ?? "")', subject: '@(token.Subject ?? "")', type: '@(token.Type ?? "")', isRevoked: @(token.IsRevoked.ToString().ToLowerInvariant()), isExpired: @(token.IsExpired.ToString().ToLowerInvariant()), created: '@(token.CreatedAt?.ToString("u") ?? "")', expires: '@(token.ExpirationDate?.ToString("u") ?? "")', revokedAt: '@(token.RevokedAt?.ToString("u") ?? "")', serializedData: this.closest('tr').getAttribute('data-serialized') })">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                                <span>Inspect Payload</span>
+                                            </button>
+                                            <button type="button" class="dropdown-item" onclick="copyToClipboard('@token.Id', event)">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                                <span>Copy Token ID</span>
+                                            </button>
+                                            @if (!token.IsRevoked)
+                                            {
+                                                <div class="dropdown-divider"></div>
+                                                <form method="post" asp-page-handler="RevokeSingle" id="revoke-token-@token.Id" style="display:block; margin:0;">
+                                                    <input type="hidden" name="tokenId" value="@token.Id" />
+                                                    <input type="hidden" name="pageNumber" value="@Model.PageNumber" />
+                                                    <input type="hidden" name="searchTerm" value="@Model.SearchTerm" />
+                                                    <input type="hidden" name="userId" value="@Model.UserId" />
+                                                    <input type="hidden" name="clientId" value="@Model.ClientId" />
+                                                    <input type="hidden" name="createdFrom" value="@Model.CreatedFrom?.ToString("yyyy-MM-dd")" />
+                                                    <input type="hidden" name="createdTo" value="@Model.CreatedTo?.ToString("yyyy-MM-dd")" />
+                                                    <input type="hidden" name="status" value="@Model.Status" />
+                                                    <input type="hidden" name="tokenType" value="@Model.TokenType" />
+                                                    <button type="button" class="dropdown-item dropdown-item-danger" onclick="openConfirmModal('Revoke Token', 'Are you sure you want to revoke this token immediately?', () => document.getElementById('revoke-token-@token.Id').submit())">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+                                                        <span>Revoke Token</span>
+                                                    </button>
+                                                </form>
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Model.Tokens.TotalCount > 0)
+        {
+            <partial name="_Pagination" model="Model.Tokens" />
+        }
+    </div>
+</div>
+
+
+
+<!-- Modal: Bulk Revoke User Tokens -->
+<div id="modal-revoke-user" class="modal-backdrop" onclick="closeModal('modal-revoke-user')">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <span>Bulk Revoke User Tokens</span>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-revoke-user')" style="padding: 0.2rem 0.45rem;">✕</button>
+        </div>
+        <form method="post" asp-page-handler="RevokeUserTokens" id="revoke-user-form">
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5;">
+                    Revoke all active tokens (access tokens, refresh tokens, auth codes) issued for a specific user ID.
+                </p>
+                <div class="form-group">
+                    <label class="form-label" for="revoke-user-input">User ID (Subject)</label>
+                    <input type="text" name="targetUserId" id="revoke-user-input" class="form-control" placeholder="Enter User ID..." data-btn-target="revoke-user-btn" required />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-revoke-user')">Cancel</button>
+                <button type="button" id="revoke-user-btn" class="btn btn-danger" disabled onclick="openConfirmModal('Revoke User Tokens', 'Revoke ALL active tokens for user ' + document.getElementById('revoke-user-input').value + '?', () => document.getElementById('revoke-user-form').submit())">Revoke All</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Bulk Revoke Client Tokens -->
+<div id="modal-revoke-client" class="modal-backdrop" onclick="closeModal('modal-revoke-client')">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <span>Bulk Revoke Client Tokens</span>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-revoke-client')" style="padding: 0.2rem 0.45rem;">✕</button>
+        </div>
+        <form method="post" asp-page-handler="RevokeClientTokens" id="revoke-client-form">
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5;">
+                    Revoke all active tokens issued to a client application.
+                </p>
+                <div class="form-group">
+                    <label class="form-label" for="revoke-client-input">Client ID</label>
+                    <input type="text" name="targetClientId" id="revoke-client-input" class="form-control" placeholder="Enter Client ID..." data-btn-target="revoke-client-btn" required />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-revoke-client')">Cancel</button>
+                <button type="button" id="revoke-client-btn" class="btn btn-danger" disabled onclick="openConfirmModal('Revoke Client Tokens', 'Revoke ALL active tokens for client ' + document.getElementById('revoke-client-input').value + '?', () => document.getElementById('revoke-client-form').submit())">Revoke All</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Slide-Over Drawer for Token Inspection -->
+<div id="token-drawer-backdrop" class="modal-backdrop" onclick="closeTokenDrawer()"></div>
+<div id="token-drawer" class="slide-over-drawer">
+    <div class="slide-over-header">
+        <h3 class="card-title" style="font-size: 1.1rem;">Token Inspection</h3>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeTokenDrawer()" style="padding: 0.25rem 0.5rem;">✕</button>
+    </div>
+    <div class="slide-over-body" id="token-drawer-body">
+        <!-- Injected via JavaScript -->
+    </div>
+</div>

@@ -1,0 +1,167 @@
+@page
+@model OpenIddict.Management.Dashboard.Pages.Applications.DetailsModel
+@{
+    ViewData["Title"] = $"Application: {Model.Application.ClientId}";
+    var prefix = DashboardOptions.Value.PathPrefix.TrimEnd('/');
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@(string.IsNullOrWhiteSpace(Model.Application.DisplayName) ? Model.Application.ClientId : Model.Application.DisplayName)</h1>
+        <p class="page-subtitle">Detailed OAuth 2.0 configuration, client credentials, and permissions for <code>@Model.Application.ClientId</code></p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+        <a href="@prefix/Applications/Edit?id=@Model.Application.Id" class="btn btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            Edit Application
+        </a>
+        <a href="@prefix/Applications" class="btn btn-secondary">Back to List</a>
+    </div>
+</div>
+
+
+<!-- Credentials & Client Secret Card -->
+<div class="card" style="margin-bottom: 1.75rem;">
+    <div class="card-header">
+        <h2 class="card-title">Credentials & Client Secret</h2>
+    </div>
+    <div class="card-body">
+        <div class="credentials-box">
+            <div>
+                <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.25rem;">Client Secret Key</div>
+                <div style="font-family: monospace; font-size: 1.1rem; color: var(--text-primary); letter-spacing: 0.15em;">••••••••••••••••••••••••</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.35rem;">Secrets are stored as cryptographic hashes and cannot be viewed in plain text.</div>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary" onclick="openRotateSecretModal('@Model.Application.Id', '@Model.Application.ClientId')">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    Rotate / Update Secret
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">General Properties</h2>
+    </div>
+    <div class="card-body">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem;">
+            <div>
+                <label class="form-label" style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Client ID</label>
+                <div style="display: flex; align-items: center; gap: 0.4rem; margin-top: 0.25rem;">
+                    <code>@Model.Application.ClientId</code>
+                    <button type="button" class="copy-btn" onclick="copyToClipboard('@Model.Application.ClientId', event)" title="Copy Client ID">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div>
+                <label class="form-label" style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Display Name</label>
+                <div style="margin-top: 0.25rem;"><strong>@(string.IsNullOrWhiteSpace(Model.Application.DisplayName) ? "-" : Model.Application.DisplayName)</strong></div>
+            </div>
+            <div>
+                <label class="form-label" style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Status</label>
+                <div style="margin-top: 0.25rem;"><partial name="_StatusBadge" model="Model.Application.Status" /></div>
+            </div>
+            <div>
+                <label class="form-label" style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Environment</label>
+                <div style="margin-top: 0.25rem;"><span class="badge badge-info">@Model.Application.Environment</span></div>
+            </div>
+            <div>
+                <label class="form-label" style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Created At</label>
+                <div style="margin-top: 0.25rem; color: var(--text-secondary);">@Model.Application.CreatedAt.ToString("f")</div>
+            </div>
+            @if (Model.Application.Tags.Count > 0)
+            {
+                <div style="grid-column: 1 / -1;">
+                    <label class="form-label" style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Tags</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.25rem;">
+                        @foreach (var tag in Model.Application.Tags)
+                        {
+                            <span class="badge badge-secondary" style="font-size: 0.8rem;">@tag</span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Redirect URIs</h2>
+    </div>
+    <div class="card-body">
+        @if (Model.Application.RedirectUris == null || !Model.Application.RedirectUris.Any())
+        {
+            <p style="color: var(--text-muted); font-size: 0.9rem;">No redirect URIs specified.</p>
+        }
+        else
+        {
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                @foreach (var uri in Model.Application.RedirectUris)
+                {
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <code>@uri</code>
+                        <button type="button" class="copy-btn" onclick="copyToClipboard('@uri', event)" title="Copy URI">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Permissions</h2>
+    </div>
+    <div class="card-body">
+        @if (Model.Application.Permissions == null || !Model.Application.Permissions.Any())
+        {
+            <p style="color: var(--text-muted); font-size: 0.9rem;">No permissions assigned.</p>
+        }
+        else
+        {
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                @foreach (var perm in Model.Application.Permissions)
+                {
+                    <span class="badge badge-secondary" style="font-family: monospace; font-size: 0.8rem;">@perm</span>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Standalone Rotate Secret Modal -->
+<div id="rotate-secret-backdrop" class="modal-backdrop" onclick="closeRotateSecretModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <span>Rotate Client Secret</span>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeRotateSecretModal()" style="padding: 0.2rem 0.45rem;">✕</button>
+        </div>
+        <form method="post" asp-page-handler="UpdateSecret">
+            <div class="modal-body">
+                <input type="hidden" name="id" id="rotate-secret-app-id" value="@Model.Application.Id" />
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5;">
+                    Generate or specify a new client secret for <strong id="rotate-secret-client-name" style="color: var(--text-primary);">@Model.Application.ClientId</strong>. Once saved, previous secrets are immediately invalidated.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label" for="rotate-secret-input">New Client Secret</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" name="newSecret" id="rotate-secret-input" class="form-control" placeholder="Enter or generate secret..." data-btn-target="details-secret-submit-btn" required />
+                        <button type="button" class="btn btn-secondary" onclick="generateClientSecret('rotate-secret-input')">Generate</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeRotateSecretModal()">Cancel</button>
+                <button type="submit" id="details-secret-submit-btn" class="btn btn-primary" disabled>Save New Secret</button>
+            </div>
+        </form>
+    </div>
+</div>

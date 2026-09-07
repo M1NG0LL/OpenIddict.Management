@@ -1,0 +1,115 @@
+@page
+@model OpenIddict.Management.Dashboard.Pages.IndexModel
+@{
+    ViewData["Title"] = "Overview";
+    var prefix = DashboardOptions.Value.PathPrefix.TrimEnd('/');
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard Overview</h1>
+        <p class="page-subtitle">Monitor and manage your OpenIddict applications, tokens, sessions, and scopes.</p>
+    </div>
+</div>
+
+<div class="metrics-grid">
+    <div class="metric-card metric-apps">
+        <div class="metric-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            </svg>
+        </div>
+        <div>
+            <div class="metric-value">@Model.TotalApplications</div>
+            <div class="metric-label">Applications (@Model.ActiveApplications Active)</div>
+        </div>
+    </div>
+
+    <div class="metric-card metric-scopes">
+        <div class="metric-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+        </div>
+        <div>
+            <div class="metric-value">@Model.TotalScopes</div>
+            <div class="metric-label">Configured Scopes</div>
+        </div>
+    </div>
+
+    <div class="metric-card metric-tokens">
+        <div class="metric-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+            </svg>
+        </div>
+        <div>
+            <div class="metric-value">@Model.TotalTokens</div>
+            <div class="metric-label">Tracked Tokens (@Model.RevokedTokens Revoked)</div>
+        </div>
+    </div>
+
+    <div class="metric-card metric-sessions">
+        <div class="metric-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+        </div>
+        <div>
+            <div class="metric-value">@Model.ActiveAuthorizations</div>
+            <div class="metric-label">Active Authorizations</div>
+        </div>
+    </div>
+</div>
+
+<div class="section-title-group">
+    <h2 class="section-title">Quick Actions</h2>
+    <p class="section-subtitle">Common operations and identity management shortcuts</p>
+</div>
+
+<div class="action-grid">
+    <a href="@prefix/Applications/Create" class="action-card">
+        <div class="action-card-header">
+            <div class="action-card-icon action-icon-apps">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </div>
+            <span class="action-card-arrow">↗</span>
+        </div>
+        <div class="action-card-title">Create Application</div>
+        <p class="action-card-desc">Register a new client application with OAuth2 credentials and redirect URIs.</p>
+    </a>
+
+    <a href="@prefix/Tokens" class="action-card">
+        <div class="action-card-header">
+            <div class="action-card-icon action-icon-tokens">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </div>
+            <span class="action-card-arrow">↗</span>
+        </div>
+        <div class="action-card-title">Token Inspector</div>
+        <p class="action-card-desc">Search, filter, inspect, and perform single or bulk token revocations.</p>
+    </a>
+
+    <a href="@prefix/Scopes" class="action-card">
+        <div class="action-card-header">
+            <div class="action-card-icon action-icon-scopes">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+            </div>
+            <span class="action-card-arrow">↗</span>
+        </div>
+        <div class="action-card-title">Manage Scopes</div>
+        <p class="action-card-desc">Define authorization scopes and assign resource server permissions.</p>
+    </a>
+</div>

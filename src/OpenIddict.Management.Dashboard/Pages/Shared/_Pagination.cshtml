@@ -1,0 +1,49 @@
+@model OpenIddict.Management.Dto.IPagedResult
+@{
+    int pageNumber = Model?.PageNumber ?? 1;
+    int totalPages = Model?.TotalPages ?? 1;
+    int totalCount = Model?.TotalCount ?? 0;
+    bool hasPreviousPage = Model?.HasPreviousPage ?? false;
+    bool hasNextPage = Model?.HasNextPage ?? false;
+
+    var startPage = Math.Max(1, pageNumber - 2);
+    var endPage = Math.Min(totalPages, pageNumber + 2);
+}
+<div class="pagination-container">
+    <div>
+        Showing page <strong>@pageNumber</strong> of <strong>@totalPages</strong> (@totalCount items total)
+    </div>
+    <div class="pagination-controls">
+        @if (hasPreviousPage)
+        {
+            <a href="?pageNumber=@(pageNumber - 1)" class="btn btn-secondary btn-sm">&laquo; Prev</a>
+        }
+        else
+        {
+            <button class="btn btn-secondary btn-sm" disabled>&laquo; Prev</button>
+        }
+
+        <div class="pagination-pills">
+            @for (int p = startPage; p <= endPage; p++)
+            {
+                if (p == pageNumber)
+                {
+                    <span class="page-pill active">@p</span>
+                }
+                else
+                {
+                    <a href="?pageNumber=@p" class="page-pill">@p</a>
+                }
+            }
+        </div>
+
+        @if (hasNextPage)
+        {
+            <a href="?pageNumber=@(pageNumber + 1)" class="btn btn-secondary btn-sm">Next &raquo;</a>
+        }
+        else
+        {
+            <button class="btn btn-secondary btn-sm" disabled>Next &raquo;</button>
+        }
+    </div>
+</div>

@@ -1,0 +1,160 @@
+@using OpenIddict.Management.Dashboard
+@inject Microsoft.Extensions.Options.IOptions<DashboardOptions> Options
+@{
+    var title = ViewData["Title"] as string ?? Options.Value.DashboardTitle;
+    var prefix = Options.Value.PathPrefix.TrimEnd('/');
+}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@title - OpenIddict Management</title>
+    <link rel="stylesheet" href="/_content/OpenIddict.Management.Dashboard/css/dashboard.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <img src="/_content/OpenIddict.Management.Dashboard/images/logo.svg" alt="OpenIddict Logo" class="sidebar-brand-logo" width="32" height="32" />
+            <div class="sidebar-brand-text">
+                <span class="sidebar-brand-title">@Options.Value.DashboardTitle</span>
+                <span class="sidebar-brand-subtitle">Management</span>
+            </div>
+        </div>
+        <partial name="_Navigation" />
+    </aside>
+
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button type="button" class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()" aria-label="Toggle Navigation Menu">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <partial name="_Breadcrumbs" />
+            </div>
+            <div class="topbar-actions">
+                <button type="button" class="topbar-search-btn" id="topbar-search-trigger" onclick="openCommandPalette()" aria-label="Command Palette">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <span>Search or jump to...</span>
+                    <kbd class="topbar-kbd">⌘K</kbd>
+                </button>
+
+                <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" aria-label="Toggle Theme" title="Toggle Theme">
+                    <svg class="theme-icon theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="theme-icon theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <main class="content-container">
+            @RenderBody()
+        </main>
+    </div>
+
+    <!-- Linear-style Command Palette Modal -->
+    <div id="command-palette-backdrop" class="modal-backdrop" onclick="closeCommandPalette()">
+        <div class="command-palette" onclick="event.stopPropagation()">
+            <div class="command-header">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="command-palette-input" class="command-input" placeholder="Type a command or search..." autocomplete="off" />
+                <kbd class="command-escape-kbd" onclick="closeCommandPalette()">ESC</kbd>
+            </div>
+            <div class="command-list" id="command-palette-list">
+                <div class="command-group-title">NAVIGATION</div>
+                <div class="command-item active" data-url="@prefix" data-title="Overview Dashboard">
+                    <svg class="command-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Overview Dashboard</span>
+                    <span class="command-item-shortcut">Jump to</span>
+                </div>
+                <div class="command-item" data-url="@prefix/Applications" data-title="Applications">
+                    <svg class="command-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                    <span>Applications List</span>
+                    <span class="command-item-shortcut">Jump to</span>
+                </div>
+                <div class="command-item" data-url="@prefix/Tokens" data-title="Token Inspector">
+                    <svg class="command-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+                    <span>Token Inspector & Revocation</span>
+                    <span class="command-item-shortcut">Jump to</span>
+                </div>
+                <div class="command-item" data-url="@prefix/Scopes" data-title="Scope Manager">
+                    <svg class="command-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    <span>Scope Manager</span>
+                    <span class="command-item-shortcut">Jump to</span>
+                </div>
+
+                <div class="command-group-title">QUICK ACTIONS</div>
+                <div class="command-item" data-url="@prefix/Applications/Create" data-title="Create New Application">
+                    <svg class="command-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>Create New Application</span>
+                    <span class="command-item-shortcut">Action</span>
+                </div>
+                <div class="command-item" data-url="@prefix/Scopes/Edit" data-title="Create New Scope">
+                    <svg class="command-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>Create New Scope</span>
+                    <span class="command-item-shortcut">Action</span>
+                </div>
+
+                <div class="command-group-title">PREFERENCES</div>
+                <div class="command-item" data-action="toggle-theme" data-title="Toggle Color Theme">
+                    <svg class="command-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+                    <span>Toggle Light / Dark Mode</span>
+                    <span class="command-item-shortcut">Theme</span>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(Options.Value.ExitUrl))
+                {
+                    <div class="command-item" data-url="@Options.Value.ExitUrl" data-title="@(string.IsNullOrWhiteSpace(Options.Value.ExitButtonText) ? "Exit Dashboard" : Options.Value.ExitButtonText)">
+                        <svg class="command-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        <span>@(string.IsNullOrWhiteSpace(Options.Value.ExitButtonText) ? "Exit Dashboard" : Options.Value.ExitButtonText)</span>
+                        <span class="command-item-shortcut">Exit</span>
+                    </div>
+                }
+            </div>
+            <div class="command-footer">
+                <span>Use <kbd>↑</kbd> <kbd>↓</kbd> to navigate</span>
+                <span><kbd>↵</kbd> to select</span>
+                <span><kbd>ESC</kbd> to close</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Automatic Server Status Toast -->
+    @if (TempData["StatusMessage"] is string tempStatus && !string.IsNullOrWhiteSpace(tempStatus))
+    {
+        var isErr = tempStatus.Contains("failed", StringComparison.OrdinalIgnoreCase) || tempStatus.Contains("Failed", StringComparison.OrdinalIgnoreCase) || tempStatus.Contains("error", StringComparison.OrdinalIgnoreCase);
+        <div class="server-toast-data" data-message="@tempStatus" data-type="@(isErr ? "danger" : "success")" data-title="@(isErr ? "Operation Failed" : "Success!")" style="display:none;"></div>
+    }
+
+    <div id="toast-container" class="toast-container"></div>
+    <partial name="_ConfirmDialog" />
+
+    <script src="/_content/OpenIddict.Management.Dashboard/js/dashboard.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

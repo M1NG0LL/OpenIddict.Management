@@ -1,0 +1,15 @@
+@using OpenIddict.Management.Enums
+@model ApplicationStatus
+@{
+    var (badgeClass, dotClass, label) = Model switch
+    {
+        ApplicationStatus.Active => ("badge-success", "status-dot-active", "Active"),
+        ApplicationStatus.Disabled => ("badge-warning", "status-dot-warning", "Disabled"),
+        ApplicationStatus.Deleted => ("badge-danger", "status-dot-danger", "Deleted"),
+        _ => ("badge-secondary", "status-dot-secondary", Model.ToString())
+    };
+}
+<span class="badge @badgeClass">
+    <span class="status-dot @dotClass"></span>
+    <span>@label</span>
+</span>

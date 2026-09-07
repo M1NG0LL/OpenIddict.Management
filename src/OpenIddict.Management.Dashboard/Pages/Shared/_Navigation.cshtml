@@ -1,0 +1,66 @@
+@using OpenIddict.Management.Dashboard
+@inject Microsoft.Extensions.Options.IOptions<DashboardOptions> Options
+@{
+    var prefix = Options.Value.PathPrefix.TrimEnd('/');
+    var currentPath = Context.Request.Path.Value ?? string.Empty;
+}
+<nav class="sidebar-nav">
+    <div>
+        <div class="sidebar-section">
+            <span class="sidebar-section-label">MAIN</span>
+            <ul class="sidebar-menu">
+                <li>
+                    <a href="@prefix" class="sidebar-link @(currentPath.Equals(prefix, StringComparison.OrdinalIgnoreCase) || currentPath.Equals(prefix + "/", StringComparison.OrdinalIgnoreCase) ? "active" : "")">
+                        <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                        <span>Overview</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="@prefix/Applications" class="sidebar-link @(currentPath.StartsWith(prefix + "/Applications", StringComparison.OrdinalIgnoreCase) ? "active" : "")">
+                        <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                        <span>Applications</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <div class="sidebar-section">
+            <span class="sidebar-section-label">SECURITY</span>
+            <ul class="sidebar-menu">
+                <li>
+                    <a href="@prefix/Tokens" class="sidebar-link @(currentPath.StartsWith(prefix + "/Tokens", StringComparison.OrdinalIgnoreCase) ? "active" : "")">
+                        <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+                        <span>Token Inspector</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="@prefix/Scopes" class="sidebar-link @(currentPath.StartsWith(prefix + "/Scopes", StringComparison.OrdinalIgnoreCase) ? "active" : "")">
+                        <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        <span>Scope Manager</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="sidebar-footer">
+        @if (!string.IsNullOrWhiteSpace(Options.Value.ExitUrl))
+        {
+            <a href="@Options.Value.ExitUrl" class="sidebar-exit-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span>@(string.IsNullOrWhiteSpace(Options.Value.ExitButtonText) ? "Exit Dashboard" : Options.Value.ExitButtonText)</span>
+            </a>
+        }
+        <div class="sidebar-footer-info" style="margin-top: @(!string.IsNullOrWhiteSpace(Options.Value.ExitUrl) ? "0.75rem" : "0");">
+            <span class="sidebar-footer-version">v1.0.0</span>
+            <a href="https://documentation.openiddict.com/" target="_blank" rel="noopener noreferrer" class="sidebar-footer-link">
+                <span>Docs</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </a>
+        </div>
+    </div>
+</nav>

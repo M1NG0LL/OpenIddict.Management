@@ -1,0 +1,68 @@
+@page
+@model OpenIddict.Management.Dashboard.Pages.Scopes.EditModel
+@{
+    bool isEdit = !string.IsNullOrEmpty(Model.Id);
+    ViewData["Title"] = isEdit ? $"Edit Scope: {Model.Name}" : "Create Scope";
+    var prefix = DashboardOptions.Value.PathPrefix.TrimEnd('/');
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@(isEdit ? $"Edit Scope: {Model.Name}" : "Create Scope")</h1>
+        <p class="page-subtitle">Configure scope name, description, and target resources.</p>
+    </div>
+    <div>
+        <a href="@prefix/Scopes" class="btn btn-secondary">Cancel</a>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div style="background-color: var(--danger-bg); color: var(--danger-color); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+        @Model.ErrorMessage
+    </div>
+}
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="validation-summary-errors" style="display: @(ViewData.ModelState.IsValid ? "none" : "block");"></div>
+
+            <div class="form-group">
+                <label class="form-label" for="Name">Scope Name *</label>
+                @if (isEdit)
+                {
+                    <input type="text" asp-for="Name" class="form-control" readonly />
+                }
+                else
+                {
+                    <input type="text" asp-for="Name" class="form-control" placeholder="api_read" required />
+                    <span asp-validation-for="Name" class="field-validation-error"></span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="DisplayName">Display Name</label>
+                <input type="text" asp-for="DisplayName" class="form-control" placeholder="Read API Access" />
+                <span asp-validation-for="DisplayName" class="field-validation-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="Description">Description</label>
+                <textarea asp-for="Description" class="form-control" rows="3" placeholder="Grants read access to API resources."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="ResourcesText">Associated Resources (comma or line separated)</label>
+                <textarea asp-for="ResourcesText" class="form-control" rows="3" placeholder="rs_identity_api, rs_billing_api"></textarea>
+                <span asp-validation-for="ResourcesText" class="field-validation-error"></span>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                <button type="submit" class="btn btn-primary">@(isEdit ? "Save Changes" : "Create Scope")</button>
+                <a href="@prefix/Scopes" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

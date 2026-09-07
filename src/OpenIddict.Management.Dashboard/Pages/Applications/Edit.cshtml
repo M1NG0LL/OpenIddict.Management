@@ -1,0 +1,191 @@
+@page
+@model OpenIddict.Management.Dashboard.Pages.Applications.EditModel
+@using OpenIddict.Management.Dashboard.Helpers
+@{
+    ViewData["Title"] = $"Edit Application: {Model.ClientId}";
+    var prefix = DashboardOptions.Value.PathPrefix.TrimEnd('/');
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Edit Application: @Model.ClientId</h1>
+        <p class="page-subtitle">Update application properties, permissions, and status.</p>
+    </div>
+    <div>
+        <a href="@prefix/Applications/Details?id=@Model.Id" class="btn btn-secondary">Cancel</a>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div style="background-color: var(--danger-bg); color: var(--danger-color); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+        @Model.ErrorMessage
+    </div>
+}
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="validation-summary-errors" style="display: @(ViewData.ModelState.IsValid ? "none" : "block");"></div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                <div class="form-group">
+                    <label class="form-label" for="DisplayName">Display Name *</label>
+                    <input type="text" asp-for="DisplayName" class="form-control" required />
+                    <span asp-validation-for="DisplayName" class="field-validation-error"></span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="Status">Status</label>
+                    <select asp-for="Status" class="form-select">
+                        @foreach (var status in Enum.GetValues<OpenIddict.Management.Enums.ApplicationStatus>())
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                <div class="form-group">
+                    <label class="form-label" for="Environment">Environment</label>
+                    <select asp-for="Environment" class="form-select">
+                        @foreach (var env in Enum.GetValues<OpenIddict.Management.Enums.ApplicationEnvironment>())
+                        {
+                            <option value="@env">@env</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="Description">Description</label>
+                <textarea asp-for="Description" class="form-control" rows="2"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="RedirectUrisText">Redirect URIs (one per line)</label>
+                <textarea asp-for="RedirectUrisText" class="form-control" rows="2"></textarea>
+                <span asp-validation-for="RedirectUrisText" class="field-validation-error"></span>
+            </div>
+
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label class="form-label">Application Tags</label>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Categorize this application client using predefined or custom tags.</p>
+                @if (Model.AvailableTags.Count > 0)
+                {
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        @foreach (var tag in Model.AvailableTags)
+                        {
+                            var isTagChecked = Model.SelectedTags.Contains(tag, StringComparer.OrdinalIgnoreCase);
+                            <label style="display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; background: var(--bg-primary); border: 1px solid var(--border-color); padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem;">
+                                <input type="checkbox" name="SelectedTags" value="@tag" checked="@isTagChecked" style="cursor: pointer;" />
+                                <span>@tag</span>
+                            </label>
+                        }
+                    </div>
+                }
+                <input type="text" asp-for="CustomTagsText" class="form-control" placeholder="Additional custom tags (comma or space separated, e.g. mobile, finance, internal)..." />
+            </div>
+
+            <div style="margin-top: 2rem; margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+                    <div>
+                        <h3 style="font-size: 1.1rem; color: var(--text-primary); font-weight: 600;">Choose Permissions</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Select the endpoints, grant types, response types, standard scopes, and custom scopes granted to this application.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyPermissionPreset('webapp')">Preset: Web App</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyPermissionPreset('m2m')">Preset: Machine-to-Machine</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyPermissionPreset('clear')">Clear All</button>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem;">
+                    @foreach (var group in OpenIddictPermissionCatalog.Groups)
+                    {
+                        <div style="background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem;">
+                            <h4 style="font-size: 0.95rem; color: var(--accent-primary); margin-bottom: 0.75rem; font-weight: 600;">@group.Category</h4>
+                            <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                                @foreach (var item in group.Items)
+                                {
+                                    var isChecked = Model.SelectedPermissions.Contains(item.Value);
+                                    <label style="display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer; font-size: 0.85rem; user-select: none;">
+                                        <input type="checkbox" name="SelectedPermissions" value="@item.Value" class="perm-checkbox" checked="@isChecked" style="margin-top: 0.2rem; cursor: pointer;" />
+                                        <div>
+                                            <div style="font-weight: 500; color: var(--text-primary);">@item.DisplayName <code style="font-size: 0.75rem; opacity: 0.7;">(@item.Value)</code></div>
+                                            <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.3;">@item.Description</div>
+                                        </div>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (Model.CustomScopes.Count > 0)
+                    {
+                        <div style="background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem;">
+                            <h4 style="font-size: 0.95rem; color: var(--accent-primary); margin-bottom: 0.75rem; font-weight: 600;">Custom Scopes</h4>
+                            <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                                @foreach (var scope in Model.CustomScopes)
+                                {
+                                    var scopePerm = scope.Name.StartsWith("scp:", StringComparison.OrdinalIgnoreCase) ? scope.Name : $"scp:{scope.Name}";
+                                    var isChecked = Model.SelectedPermissions.Contains(scopePerm, StringComparer.OrdinalIgnoreCase);
+                                    <label style="display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer; font-size: 0.85rem; user-select: none;">
+                                        <input type="checkbox" name="SelectedPermissions" value="@scopePerm" class="perm-checkbox" checked="@isChecked" style="margin-top: 0.2rem; cursor: pointer;" />
+                                        <div>
+                                            <div style="font-weight: 500; color: var(--text-primary);">@(string.IsNullOrWhiteSpace(scope.DisplayName) ? scope.Name : scope.DisplayName) <code style="font-size: 0.75rem; opacity: 0.7;">(@scopePerm)</code></div>
+                                            @if (!string.IsNullOrWhiteSpace(scope.Description))
+                                            {
+                                                <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.3;">@scope.Description</div>
+                                            }
+                                        </div>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="form-group" style="margin-top: 1.25rem;">
+                    <label class="form-label" for="CustomPermissionsText">Custom / Additional Permissions (comma or line separated)</label>
+                    <input type="text" asp-for="CustomPermissionsText" class="form-control" placeholder="e.g. scp:custom_resource, custom:perm" />
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <a href="@prefix/Applications/Details?id=@Model.Id" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function applyPermissionPreset(preset) {
+    const checkboxes = document.querySelectorAll('.perm-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+
+    if (preset === 'webapp') {
+        const webappPerms = [
+            'ept:authorization', 'ept:token', 'ept:logout',
+            'gt:authorization_code', 'gt:refresh_token',
+            'rst:code',
+            'scp:openid', 'scp:profile', 'scp:email'
+        ];
+        checkboxes.forEach(cb => {
+            if (webappPerms.includes(cb.value)) cb.checked = true;
+        });
+    } else if (preset === 'm2m') {
+        const m2mPerms = [
+            'ept:token', 'gt:client_credentials'
+        ];
+        checkboxes.forEach(cb => {
+            if (m2mPerms.includes(cb.value)) cb.checked = true;
+        });
+    }
+}
+</script>
+}
