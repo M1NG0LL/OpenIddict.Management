@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
@@ -23,7 +25,13 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Server=.;Database=OpenIddictManagementMvc;Trusted_Connection=True;MultipleActiveResultSets=true;Encrypt=False";
 
-builder.Services.AddHttpClient();
+// Register HttpClient with development-friendly certificate validation for local loopback calls
+builder.Services.AddHttpClient("LocalAuthClient")
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    });
+
 builder.Services.AddAntiforgery();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -49,6 +57,7 @@ builder.Services.AddOpenIddict()
 
         options.AllowAuthorizationCodeFlow()
                .AllowClientCredentialsFlow()
+               .AllowPasswordFlow
                .AllowRefreshTokenFlow()
                .RequireProofKeyForCodeExchange();
 
@@ -113,6 +122,7 @@ using (var scope = app.Services.CreateScope())
         "https://localhost:5001/callback",
         "http://localhost:5084/callback",
         "https://localhost:51378/callback",
+        "http://localhost:51379/callback",
         "https://localhost:7198/callback"
     };
 
@@ -139,7 +149,8 @@ using (var scope = app.Services.CreateScope())
             DisplayName = "Sample MVC Client Application",
             Environment = ApplicationEnvironment.Development,
             RedirectUris = redirectUris,
-            Permissions = permissions
+            Permissions = permissions,
+            DefaultScopes = ["openid", "profile", "email", "api_access"]
         });
     }
     else
@@ -149,7 +160,8 @@ using (var scope = app.Services.CreateScope())
             DisplayName = "Sample MVC Client Application",
             Environment = ApplicationEnvironment.Development,
             RedirectUris = redirectUris,
-            Permissions = permissions
+            Permissions = permissions,
+            DefaultScopes = ["openid", "profile", "email", "api_access"]
         });
         await appService.UpdateClientSecretAsync(existingApp.Value.Id, "sample-secret-key-12345");
     }
@@ -178,7 +190,22 @@ app.MapOpenIddictManagementDashboard();
 // -----------------------------------------------------------------------------------------
 
 // GET /login: Renders the custom login form and preserves the OpenID returnUrl
-app.MapGet("/login", ([FromQuery] string? returnUrl) => Results.Content($@"<!DOCTYPE html>
+app.MapGet("/login", (HttpContext context) =>
+{
+    var returnUrl = context.Request.Query["returnUrl"].ToString();
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = context.Request.Query["ReturnUrl"].ToString();
+    }
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = "/";
+    }
+
+    var escapedUrl = Uri.EscapeDataString(returnUrl);
+    var htmlEncodedUrl = System.Net.WebUtility.HtmlEncode(returnUrl);
+
+    return Results.Content($@"<!DOCTYPE html>
 <html>
 <head>
     <title>Sign In — Enterprise Identity</title>
@@ -202,8 +229,8 @@ app.MapGet("/login", ([FromQuery] string? returnUrl) => Results.Content($@"<!DOC
         <span class='badge'>Auth Code + PKCE</span>
         <h2>Sign In</h2>
         <p class='subtitle'>Demo credentials: <strong>admin</strong> / <strong>password123</strong></p>
-        <form method='post' action='/login'>
-            <input type='hidden' name='returnUrl' value='{returnUrl ?? "/"}' />
+        <form method='post' action='/login?returnUrl={escapedUrl}'>
+            <input type='hidden' name='returnUrl' value='{htmlEncodedUrl}' />
             <div class='form-group'>
                 <label for='username'>Username or Email</label>
                 <input type='text' id='username' name='Username' value='admin' required />
@@ -223,12 +250,12 @@ app.MapGet("/login", ([FromQuery] string? returnUrl) => Results.Content($@"<!DOC
         </div>
     </div>
 </body>
-</html>", "text/html"));
+</html>", "text/html");
+});
 
 // POST /login: Processes credentials using the custom validation engine & signs into the Cookie session
 app.MapPost("/login", async (
     [FromForm] SampleLoginRequest request,
-    [FromForm] string? returnUrl,
     HttpContext httpContext,
     IOpenIddictLoginEngine<SampleLoginRequest> loginEngine) =>
 {
@@ -252,8 +279,22 @@ app.MapPost("/login", async (
     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
     await httpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
 
-    // 3. Redirect back to authorization endpoint (returnUrl) or root
-    return Results.Redirect(string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl);
+    // 3. Redirect back to authorization endpoint (returnUrl) or root, preserving all PKCE query params
+    var targetUrl = httpContext.Request.Query["returnUrl"].ToString();
+    if (string.IsNullOrWhiteSpace(targetUrl))
+    {
+        targetUrl = httpContext.Request.Query["ReturnUrl"].ToString();
+    }
+    if (string.IsNullOrWhiteSpace(targetUrl) && httpContext.Request.HasFormContentType)
+    {
+        targetUrl = httpContext.Request.Form["returnUrl"].ToString();
+    }
+    if (string.IsNullOrWhiteSpace(targetUrl))
+    {
+        targetUrl = "/";
+    }
+
+    return Results.Redirect(targetUrl);
 })
 .DisableAntiforgery();
 
@@ -275,19 +316,26 @@ app.MapMethods("/connect/authorize", ["GET", "POST"], async (
     }
 
     var user = authResult.Principal;
-    var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "N/A";
+    var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "user-001";
     var username = user.FindFirst(ClaimTypes.Name)?.Value ?? "admin";
     var email = user.FindFirst(ClaimTypes.Email)?.Value ?? "admin@corp.example";
-    var roles = user.FindAll(ClaimTypes.Role).Select(r => r.Value);
+    var roles = user.FindAll(ClaimTypes.Role).Select(r => r.Value).ToList();
+
+    var openIddictRequest = httpContext.GetOpenIddictServerRequest()
+        ?? throw new InvalidOperationException("The OpenIddict server request cannot be retrieved.");
+
+    var requestedScopes = openIddictRequest.GetScopes();
 
     // Build OpenIddict Principal using IOpenIddictTokenService with ExtraData and AccessToken destination
-    var principal = tokenService.CreatePrincipal(new TokenCreationParameters
+    var principal = await tokenService.CreatePrincipalAsync(new TokenCreationParameters
     {
         Subject = userId,
         Username = username,
         Email = email,
         Roles = roles,
-        Scopes = ["openid", "profile", "email", "offline_access", "api_access"],
+        Scopes = requestedScopes,
+        Audiences = ["sample-mvc-client"],
+        ClientId = "sample-mvc-client",
         ExtraData = new
         {
             TenantId = "TENANT-CORP-42",
@@ -295,7 +343,7 @@ app.MapMethods("/connect/authorize", ["GET", "POST"], async (
             Department = "Engineering",
             IsAdmin = true
         },
-        DestinationMode = ClaimDestinationMode.AccessToken
+        DestinationMode = ClaimDestinationMode.AccessTokenAndIdentityToken  
     });
 
     // Sign into OpenIddict server to issue the authorization code (PKCE)
@@ -311,7 +359,18 @@ app.MapPost("/connect/token", async (HttpContext httpContext) =>
     if (request.IsAuthorizationCodeGrantType() || request.IsRefreshTokenGrantType())
     {
         var authResult = await httpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        return Results.SignIn(authResult.Principal!, properties: null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        if (!authResult.Succeeded || authResult.Principal is null)
+        {
+            return Results.Forbid(
+                authenticationSchemes: [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme],
+                properties: new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The authorization code is invalid or has already been redeemed."
+                }));
+        }
+
+        return Results.SignIn(authResult.Principal, properties: null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
     else if (request.IsClientCredentialsGrantType())
     {
@@ -364,8 +423,18 @@ app.MapGet("/callback", async (
         return Results.BadRequest("Missing authorization code.");
     }
 
+    // Retrieve active PKCE code_verifier (from cookie or RFC 7636 fallback)
+    var codeVerifier = httpContext.Request.Cookies["pkce_verifier"];
+    if (string.IsNullOrWhiteSpace(codeVerifier))
+    {
+        codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+    }
+
+    // Clean up one-time verifier cookie
+    httpContext.Response.Cookies.Delete("pkce_verifier");
+
     // Perform token exchange with /connect/token using PKCE code_verifier
-    var client = httpClientFactory.CreateClient();
+    var client = httpClientFactory.CreateClient("LocalAuthClient");
     var currentUri = new Uri($"{httpContext.Request.Scheme}://{httpContext.Request.Host}");
     client.BaseAddress = currentUri;
 
@@ -378,7 +447,7 @@ app.MapGet("/callback", async (
             ["client_secret"] = "sample-secret-key-12345",
             ["code"] = code,
             ["redirect_uri"] = $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/callback",
-            ["code_verifier"] = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+            ["code_verifier"] = codeVerifier
         })
     };
 
@@ -390,8 +459,9 @@ app.MapGet("/callback", async (
     string scope = "openid profile email offline_access api_access";
     string expiresIn = "3600";
     string decodedClaimsJson = "{}";
+    bool isSuccess = response.IsSuccessStatusCode;
 
-    if (response.IsSuccessStatusCode)
+    if (isSuccess)
     {
         using var doc = JsonDocument.Parse(responseContent);
         var root = doc.RootElement;
@@ -408,6 +478,10 @@ app.MapGet("/callback", async (
         decodedClaimsJson = responseContent;
     }
 
+    var statusClass = isSuccess ? "status-success" : "status-error";
+    var statusText = isSuccess ? "HTTP 200 OK" : $"HTTP {(int)response.StatusCode} {response.StatusCode}";
+    var headerTitle = isSuccess ? "OAuth 2.0 PKCE Authorization Succeeded" : "OAuth 2.0 PKCE Token Exchange Failed";
+
     return Results.Content($@"<!DOCTYPE html>
 <html>
 <head>
@@ -416,8 +490,10 @@ app.MapGet("/callback", async (
         body {{ font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 2.5rem 1rem; display: flex; justify-content: center; }}
         .container {{ width: 100%; max-width: 860px; }}
         .header {{ background: #1e293b; padding: 1.5rem 2rem; border-radius: 12px 12px 0 0; border: 1px solid #334155; border-bottom: none; display: flex; align-items: center; justify-content: space-between; }}
-        .header h2 {{ margin: 0; font-size: 1.4rem; color: #38bdf8; display: flex; align-items: center; gap: 0.5rem; }}
-        .status-pill {{ background: #10b981; color: #0f172a; font-size: 0.8rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 9999px; text-transform: uppercase; }}
+        .header h2 {{ margin: 0; font-size: 1.4rem; color: {(isSuccess ? "#38bdf8" : "#ef4444")}; display: flex; align-items: center; gap: 0.5rem; }}
+        .status-pill {{ font-size: 0.8rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 9999px; text-transform: uppercase; }}
+        .status-success {{ background: #10b981; color: #0f172a; }}
+        .status-error {{ background: #ef4444; color: #ffffff; }}
         .content {{ background: #1e293b; padding: 2rem; border-radius: 0 0 12px 12px; border: 1px solid #334155; }}
         .section-title {{ font-size: 1rem; font-weight: 600; color: #cbd5e1; margin-top: 1.5rem; margin-bottom: 0.5rem; }}
         .section-title:first-child {{ margin-top: 0; }}
@@ -432,15 +508,18 @@ app.MapGet("/callback", async (
         a.btn:hover {{ background: #4f46e5; }}
         a.btn-secondary {{ background: #334155; color: #f8fafc; }}
         a.btn-secondary:hover {{ background: #475569; }}
+        .notice {{ background: #1e1b4b; border: 1px solid #6366f1; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.9rem; color: #c7d2fe; }}
     </style>
 </head>
 <body>
     <div class='container'>
         <div class='header'>
-            <h2>OAuth 2.0 PKCE Authorization Succeeded</h2>
-            <span class='status-pill'>HTTP 200 OK</span>
+            <h2>{headerTitle}</h2>
+            <span class='status-pill {statusClass}'>{statusText}</span>
         </div>
         <div class='content'>
+            {(!isSuccess ? @"<div class='notice'><strong>Note:</strong> In OAuth 2.0, authorization codes are single-use. If you refreshed this page, the code was already redeemed. Click <strong>Return Home</strong> to initiate a fresh flow.</div>" : "")}
+
             <div class='meta-grid'>
                 <div class='meta-card'>
                     <label>Token Type</label>
@@ -476,7 +555,20 @@ app.MapGet("/callback", async (
 app.MapGet("/", (HttpContext context) =>
 {
     var baseUrl = $"{context.Request.Scheme}://{context.Request.Host}";
-    var authUrl = $"/connect/authorize?client_id=sample-mvc-client&response_type=code&scope=openid%20profile%20email%20offline_access%20api_access&redirect_uri={baseUrl}/callback&code_challenge=E9Melhoa2OwvFrGMTJguCH5ZiXVlEVO76hrlBEqMup8&code_challenge_method=S256";
+    
+    // Generate fresh cryptographic PKCE parameters for each session
+    var (verifier, challenge) = GeneratePkce();
+    
+    // Persist verifier in a secure, short-lived HttpOnly cookie for the callback endpoint
+    context.Response.Cookies.Append("pkce_verifier", verifier, new CookieOptions
+    {
+        HttpOnly = true,
+        Secure = context.Request.IsHttps,
+        SameSite = SameSiteMode.Lax,
+        MaxAge = TimeSpan.FromMinutes(10)
+    });
+
+    var authUrl = $"/connect/authorize?client_id=sample-mvc-client&response_type=code&redirect_uri={baseUrl}/callback&code_challenge={challenge}&code_challenge_method=S256";
 
     return Results.Content($@"<!DOCTYPE html>
 <html>
@@ -512,6 +604,23 @@ app.Run();
 // -----------------------------------------------------------------------------------------
 // Helper Functions
 // -----------------------------------------------------------------------------------------
+
+static (string Verifier, string Challenge) GeneratePkce()
+{
+    var bytes = RandomNumberGenerator.GetBytes(32);
+    var verifier = Base64UrlEncode(bytes);
+    var challengeBytes = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
+    var challenge = Base64UrlEncode(challengeBytes);
+    return (verifier, challenge);
+}
+
+static string Base64UrlEncode(byte[] bytes)
+{
+    return Convert.ToBase64String(bytes)
+        .TrimEnd('=')
+        .Replace('+', '-')
+        .Replace('/', '_');
+}
 
 static string DecodeJwtPayload(string jwt)
 {
@@ -572,7 +681,7 @@ public sealed class SampleUserAuthProvider : IUserAuthenticationProvider<SampleL
                 userId: "user-001",
                 username: "admin",
                 roles: ["Administrator", "Developer"],
-                scopes: ["openid", "profile", "email", "api_access"],
+                clientId: "sample-mvc-client",
                 extraData: extraData,
                 destinationMode: ClaimDestinationMode.AccessToken,
                 email: "admin@corp.example"

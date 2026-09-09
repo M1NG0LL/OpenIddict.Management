@@ -59,6 +59,70 @@ public class ApplicationManagementServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateAsync_WithDefaultScopes_SerializesJsonAndReturnsInModel()
+    {
+        // Arrange
+        await using var context = new TestDbContext(_options);
+        var service = new EfCoreApplicationManagementStore<TestDbContext, Guid>(context, TimeProvider.System);
+
+        var dto = new ApplicationCreateDto
+        {
+            ClientId = "app-default-scopes-1",
+            DisplayName = "Default Scopes Application",
+            DefaultScopes = ["openid", "profile", "email", "api_access"]
+        };
+
+        // Act
+        var result = await service.CreateAsync(dto);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        var app = result.Value;
+        app.DefaultScopes.Should().BeEquivalentTo(["openid", "profile", "email", "api_access"]);
+
+        // Verify direct from database entity
+        var entity = await context.Applications.FirstAsync(a => a.ClientId == "app-default-scopes-1");
+        entity.DefaultScopes.Should().NotBeNullOrWhiteSpace();
+        entity.GetDefaultScopes().Should().BeEquivalentTo(["openid", "profile", "email", "api_access"]);
+
+        // Verify retrieval via service
+        var getResult = await service.GetByIdAsync(app.Id);
+        getResult.IsSuccess.Should().BeTrue();
+        getResult.Value.DefaultScopes.Should().BeEquivalentTo(["openid", "profile", "email", "api_access"]);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithDefaultScopes_UpdatesSerializedJsonAndReturnsInModel()
+    {
+        // Arrange
+        await using var context = new TestDbContext(_options);
+        var service = new EfCoreApplicationManagementStore<TestDbContext, Guid>(context, TimeProvider.System);
+
+        var createResult = await service.CreateAsync(new ApplicationCreateDto
+        {
+            ClientId = "app-update-scopes",
+            DisplayName = "Update Scopes App",
+            DefaultScopes = ["openid", "profile"]
+        });
+        createResult.IsSuccess.Should().BeTrue();
+
+        // Act
+        var updateResult = await service.UpdateAsync(createResult.Value.Id, new ApplicationUpdateDto
+        {
+            DisplayName = "Update Scopes App",
+            DefaultScopes = ["openid", "profile", "offline_access", "custom_scope"]
+        });
+
+        // Assert
+        updateResult.IsSuccess.Should().BeTrue();
+        updateResult.Value.DefaultScopes.Should().BeEquivalentTo(["openid", "profile", "offline_access", "custom_scope"]);
+
+        var getResult = await service.GetByIdAsync(createResult.Value.Id);
+        getResult.IsSuccess.Should().BeTrue();
+        getResult.Value.DefaultScopes.Should().BeEquivalentTo(["openid", "profile", "offline_access", "custom_scope"]);
+    }
+
+    [Fact]
     public async Task CreateAsync_DuplicateClientId_ReturnsFailureResultWithDuplicateEntityHeader()
     {
         // Arrange

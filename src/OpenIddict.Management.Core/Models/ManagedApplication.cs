@@ -78,6 +78,11 @@ public sealed record ManagedApplication
     public IReadOnlyList<string> Permissions { get; init; } = [];
 
     /// <summary>
+    /// Gets the default scopes that are added by default while authorizing.
+    /// </summary>
+    public IReadOnlyList<string> DefaultScopes { get; init; } = [];
+
+    /// <summary>
     /// Gets additional metadata for the application.
     /// </summary>
     public string? ExtraData { get; init; }

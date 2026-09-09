@@ -58,6 +58,11 @@ public sealed record ApplicationUpdateDto
     public IReadOnlyList<string> Permissions { get; init; } = [];
 
     /// <summary>
+    /// Gets the updated default scopes that will be added by default while authorizing.
+    /// </summary>
+    public IReadOnlyList<string> DefaultScopes { get; init; } = [];
+
+    /// <summary>
     /// Gets updated optional extra data for the application.
     /// </summary>
     public string? ExtraData { get; init; }

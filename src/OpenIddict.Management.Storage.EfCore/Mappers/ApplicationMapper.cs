@@ -28,6 +28,7 @@ internal static class ApplicationMapper
             RedirectUris = DeserializeJsonList(entity.RedirectUris),
             PostLogoutRedirectUris = DeserializeJsonList(entity.PostLogoutRedirectUris),
             Permissions = DeserializeJsonList(entity.Permissions),
+            DefaultScopes = DeserializeJsonList(entity.DefaultScopes),
             Requirements = DeserializeJsonList(entity.Requirements)
         };
     }

@@ -9,16 +9,20 @@ namespace OpenIddict.Management.Contracts;
 public interface IOpenIddictTokenService
 {
     /// <summary>
-    /// Constructs a fully configured <see cref="ClaimsPrincipal"/> using the specified <see cref="TokenCreationParameters"/>.
+    /// Constructs a fully configured <see cref="ClaimsPrincipal"/> using the specified <see cref="TokenCreationParameters"/> asynchronously,
+    /// resolving default scopes for the specified <see cref="TokenCreationParameters.ClientId"/> if applicable.
     /// </summary>
-    /// <param name="parameters">The parameters including subject, username, roles, scopes, and extra metadata.</param>
-    /// <returns>A <see cref="ClaimsPrincipal"/> configured with appropriate OpenIddict claim destinations.</returns>
-    ClaimsPrincipal CreatePrincipal(TokenCreationParameters parameters);
+    /// <param name="parameters">The token creation parameters.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task that completes with the configured <see cref="ClaimsPrincipal"/>.</returns>
+    Task<ClaimsPrincipal> CreatePrincipalAsync(TokenCreationParameters parameters, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Constructs a fully configured <see cref="ClaimsPrincipal"/> from a successful <see cref="LoginResult"/>.
+    /// Constructs a fully configured <see cref="ClaimsPrincipal"/> from a successful <see cref="LoginResult"/> asynchronously,
+    /// resolving default scopes for the specified client ID if applicable.
     /// </summary>
-    /// <param name="loginResult">The successful login result containing user and token metadata.</param>
-    /// <returns>A <see cref="ClaimsPrincipal"/> configured with appropriate OpenIddict claim destinations.</returns>
-    ClaimsPrincipal CreatePrincipal(LoginResult loginResult);
+    /// <param name="loginResult">The login result.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task that completes with the configured <see cref="ClaimsPrincipal"/>.</returns>
+    Task<ClaimsPrincipal> CreatePrincipalAsync(LoginResult loginResult, CancellationToken cancellationToken = default);
 }

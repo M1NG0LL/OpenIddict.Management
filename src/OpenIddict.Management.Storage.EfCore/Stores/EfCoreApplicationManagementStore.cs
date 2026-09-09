@@ -191,6 +191,7 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
         entity.RedirectUris = FilterValidAbsoluteUris(dto.RedirectUris);
         entity.PostLogoutRedirectUris = FilterValidAbsoluteUris(dto.PostLogoutRedirectUris);
         entity.Permissions = JsonSerializer.Serialize(dto.Permissions);
+        entity.DefaultScopes = JsonSerializer.Serialize(dto.DefaultScopes);
         entity.Requirements = JsonSerializer.Serialize(dto.Requirements);
 
         if (!string.IsNullOrWhiteSpace(dto.ClientSecret))
@@ -246,6 +247,7 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
         entity.RedirectUris = FilterValidAbsoluteUris(dto.RedirectUris);
         entity.PostLogoutRedirectUris = FilterValidAbsoluteUris(dto.PostLogoutRedirectUris);
         entity.Permissions = JsonSerializer.Serialize(dto.Permissions);
+        entity.DefaultScopes = JsonSerializer.Serialize(dto.DefaultScopes);
         entity.Requirements = JsonSerializer.Serialize(dto.Requirements);
 
         await dbContext.SaveChangesAsync(cancellationToken);

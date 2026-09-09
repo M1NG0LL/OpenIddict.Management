@@ -57,6 +57,14 @@ public class CreateModel(
     /// <summary>Gets custom scopes defined in the system.</summary>
     public IReadOnlyList<ManagedScope> CustomScopes { get; set; } = [];
 
+    /// <summary>Gets or sets selected default scopes from checkboxes.</summary>
+    [BindProperty]
+    public List<string> SelectedDefaultScopes { get; set; } = [];
+
+    /// <summary>Gets or sets optional custom default scopes (comma or line separated).</summary>
+    [BindProperty]
+    public string? CustomDefaultScopesText { get; set; }
+
     /// <summary>Gets or sets selected permissions from checkboxes.</summary>
     [BindProperty]
     public List<string> SelectedPermissions { get; set; } = [];
@@ -85,6 +93,8 @@ public class CreateModel(
             "scp:email"
         ];
 
+        SelectedDefaultScopes = ["openid", "profile", "email"];
+
         await LoadCustomScopesAsync(cancellationToken);
     }
 
@@ -112,6 +122,18 @@ public class CreateModel(
         {
             await LoadCustomScopesAsync(cancellationToken);
             return Page();
+        }
+
+        var defaultScopesSet = new HashSet<string>(SelectedDefaultScopes, StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(CustomDefaultScopesText))
+        {
+            var customScopes = CustomDefaultScopesText
+                .Split(['\r', '\n', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var scp in customScopes)
+            {
+                var normalized = scp.StartsWith("scp:", StringComparison.OrdinalIgnoreCase) ? scp[4..] : scp;
+                defaultScopesSet.Add(normalized);
+            }
         }
 
         var permissionsSet = new HashSet<string>(SelectedPermissions, StringComparer.OrdinalIgnoreCase);
@@ -146,6 +168,7 @@ public class CreateModel(
             Description = Description,
             RedirectUris = redirectUris,
             Permissions = permissionsSet.ToList(),
+            DefaultScopes = defaultScopesSet.ToList(),
             Tags = tagsSet.ToList()
         };
 

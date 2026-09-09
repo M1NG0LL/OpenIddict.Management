@@ -21,6 +21,7 @@ public class ManagementApplicationConfiguration<TKey> : IEntityTypeConfiguration
         builder.Property(a => a.Description).HasMaxLength(500);
         builder.Property(a => a.LogoUri).HasMaxLength(2000);
         builder.Property(a => a.OwnerUserId).HasMaxLength(450);
+        builder.Property(a => a.DefaultScopes);
 
         builder.PrimitiveCollection(a => a.Tags);
 

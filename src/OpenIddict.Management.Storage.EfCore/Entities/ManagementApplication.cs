@@ -27,6 +27,11 @@ public class ManagementApplication<TKey> : OpenIddictEntityFrameworkCoreApplicat
     public string? AllowedRolesJson { get; set; }
 
     /// <summary>
+    /// Gets or sets the JSON representation of default scopes for the application.
+    /// </summary>
+    public string? DefaultScopes { get; set; }
+
+    /// <summary>
     /// Gets or sets a description of the application.
     /// </summary>
     public string? Description { get; set; }
@@ -110,6 +115,42 @@ public class ManagementApplication<TKey> : OpenIddictEntityFrameworkCoreApplicat
         }
 
         AllowedRolesJson = JsonSerializer.Serialize(roles);
+    }
+
+    /// <summary>
+    /// Gets the list of default scopes parsed from <see cref="DefaultScopes"/>.
+    /// </summary>
+    /// <returns>A list of scope names.</returns>
+    public List<string> GetDefaultScopes()
+    {
+        if (string.IsNullOrWhiteSpace(DefaultScopes))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(DefaultScopes) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Sets the list of default scopes by serializing it into <see cref="DefaultScopes"/>.
+    /// </summary>
+    /// <param name="scopes">The default scope names to set.</param>
+    public void SetDefaultScopes(IEnumerable<string>? scopes)
+    {
+        if (scopes is null)
+        {
+            DefaultScopes = null;
+            return;
+        }
+
+        DefaultScopes = JsonSerializer.Serialize(scopes);
     }
 }
 

@@ -34,9 +34,19 @@ public sealed record LoginResult
     public IReadOnlyList<string> Roles { get; init; } = [];
 
     /// <summary>
+    /// Gets the optional client identifier (ClientId) associated with the authentication session.
+    /// </summary>
+    public string? ClientId { get; init; }
+
+    /// <summary>
     /// Gets the scopes granted to the authenticated session.
     /// </summary>
     public IReadOnlyList<string> Scopes { get; init; } = [];
+
+    /// <summary>
+    /// Gets the optional default scopes associated with the client application.
+    /// </summary>
+    public IReadOnlyList<string> DefaultScopes { get; init; } = [];
 
     /// <summary>
     /// Gets the resources / audiences targeted by the token.
@@ -47,6 +57,11 @@ public sealed record LoginResult
     /// Gets custom claims to include in the generated principal.
     /// </summary>
     public IReadOnlyList<Claim> Claims { get; init; } = [];
+
+    /// <summary>
+    /// Gets an optional list of audiences to attach to the principal.
+    /// </summary>
+    public IReadOnlyList<string> Audiences { get; init; } = [];
 
     /// <summary>
     /// Gets an optional custom object or dictionary containing extra metadata/claims to embed in the token.
@@ -62,6 +77,11 @@ public sealed record LoginResult
     /// Gets the destination token type(s) for claims. Defaults to <see cref="ClaimDestinationMode.AccessToken"/>.
     /// </summary>
     public ClaimDestinationMode DestinationMode { get; init; } = ClaimDestinationMode.AccessToken;
+
+    /// <summary>
+    /// Gets an optional custom delegate to determine the destination(s) for a given claim.
+    /// </summary>
+    public Func<Claim, IEnumerable<string>?>? DestinationSelector { get; init; }
 
     /// <summary>
     /// Gets the error header or code if login failed.
@@ -115,18 +135,24 @@ public sealed record LoginResult
         ClaimDestinationMode destinationMode = ClaimDestinationMode.AccessToken,
         string? email = null,
         IEnumerable<string>? resources = null,
-        IEnumerable<Claim>? claims = null) => new()
+        IEnumerable<Claim>? claims = null,
+        Func<Claim, IEnumerable<string>?>? destinationSelector = null,
+        string? clientId = null,
+        IEnumerable<string>? defaultScopes = null) => new()
     {
         Type = LoginResultType.Success,
         UserId = userId,
         Username = username,
         Email = email,
+        ClientId = clientId,
         Roles = roles?.ToList() ?? [],
         Scopes = scopes?.ToList() ?? [],
+        DefaultScopes = defaultScopes?.ToList() ?? [],
         Resources = resources?.ToList() ?? [],
         Claims = claims?.ToList() ?? [],
         ExtraData = extraData,
-        DestinationMode = destinationMode
+        DestinationMode = destinationMode,
+        DestinationSelector = destinationSelector
     };
 
     /// <summary>

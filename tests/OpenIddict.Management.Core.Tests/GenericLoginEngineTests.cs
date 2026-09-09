@@ -65,7 +65,7 @@ public class GenericLoginEngineTests
         result.UserId.Should().Be("dev-001");
 
         // Verify token creation from the generic result
-        var principal = tokenService.CreatePrincipal(result);
+        var principal = await tokenService.CreatePrincipalAsync(result);
         principal.GetClaim("Tenant").Should().Be("tenant-1");
     }
 

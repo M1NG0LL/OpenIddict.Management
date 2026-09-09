@@ -57,4 +57,23 @@ public static class OpenIddictPermissionCatalog
             new("scp:offline_access", "Offline Access (scp:offline_access)", "Requests refresh token issuance for long-term access.")
         ])
     ];
+
+    /// <summary>
+    /// Represents a selectable scope item.
+    /// </summary>
+    public sealed record ScopeItem(string Name, string DisplayName, string Description);
+
+    /// <summary>
+    /// Gets standard OpenID Connect / OAuth 2.0 scopes.
+    /// </summary>
+    public static readonly IReadOnlyList<ScopeItem> StandardScopes =
+    [
+        new("openid", "OpenID", "Required for OpenID Connect identity tokens."),
+        new("profile", "Profile", "Grants access to default user profile information."),
+        new("email", "Email", "Grants access to user email address and verification status."),
+        new("phone", "Phone", "Grants access to user phone number."),
+        new("address", "Address", "Grants access to user postal address."),
+        new("roles", "Roles", "Grants access to assigned user security roles."),
+        new("offline_access", "Offline Access", "Requests refresh token issuance for long-term access.")
+    ];
 }

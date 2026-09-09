@@ -60,6 +60,14 @@ public class EditModel(
     /// <summary>Gets custom scopes defined in the system.</summary>
     public IReadOnlyList<ManagedScope> CustomScopes { get; set; } = [];
 
+    /// <summary>Gets or sets selected default scopes from checkboxes.</summary>
+    [BindProperty]
+    public List<string> SelectedDefaultScopes { get; set; } = [];
+
+    /// <summary>Gets or sets optional custom default scopes (comma or line separated).</summary>
+    [BindProperty]
+    public string? CustomDefaultScopesText { get; set; }
+
     /// <summary>Gets or sets selected permissions from checkboxes.</summary>
     [BindProperty]
     public List<string> SelectedPermissions { get; set; } = [];
@@ -95,6 +103,17 @@ public class EditModel(
         SelectedTags = app.Tags?.Where(t => availableTagsSet.Contains(t)).ToList() ?? [];
         var otherTags = app.Tags?.Where(t => !availableTagsSet.Contains(t)).ToList();
         CustomTagsText = otherTags != null && otherTags.Count > 0 ? string.Join(", ", otherTags) : null;
+
+        // Default scopes partitioning
+        var allSelectableScopes = OpenIddictPermissionCatalog.StandardScopes.Select(s => s.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var scope in CustomScopes)
+        {
+            allSelectableScopes.Add(scope.Name);
+        }
+
+        SelectedDefaultScopes = app.DefaultScopes?.Where(s => allSelectableScopes.Contains(s)).ToList() ?? [];
+        var otherScopes = app.DefaultScopes?.Where(s => !allSelectableScopes.Contains(s)).ToList();
+        CustomDefaultScopesText = otherScopes != null && otherScopes.Count > 0 ? string.Join(", ", otherScopes) : null;
 
         // Permissions partitioning
         var allSelectable = OpenIddictPermissionCatalog.Groups.SelectMany(g => g.Items).Select(i => i.Value).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -132,6 +151,18 @@ public class EditModel(
             return Page();
         }
 
+        var defaultScopesSet = new HashSet<string>(SelectedDefaultScopes, StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(CustomDefaultScopesText))
+        {
+            var customScopes = CustomDefaultScopesText
+                .Split(['\r', '\n', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var scp in customScopes)
+            {
+                var normalized = scp.StartsWith("scp:", StringComparison.OrdinalIgnoreCase) ? scp[4..] : scp;
+                defaultScopesSet.Add(normalized);
+            }
+        }
+
         var permissionsSet = new HashSet<string>(SelectedPermissions, StringComparer.OrdinalIgnoreCase);
 
         if (!string.IsNullOrWhiteSpace(CustomPermissionsText))
@@ -163,6 +194,7 @@ public class EditModel(
             Description = Description,
             RedirectUris = redirectUris,
             Permissions = permissionsSet.ToList(),
+            DefaultScopes = defaultScopesSet.ToList(),
             Tags = tagsSet.ToList()
         };
 

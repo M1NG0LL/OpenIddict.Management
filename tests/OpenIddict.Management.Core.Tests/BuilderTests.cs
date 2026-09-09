@@ -24,8 +24,11 @@ public class BuilderTests
 
     private sealed class CustomTokenService : IOpenIddictTokenService
     {
-        public ClaimsPrincipal CreatePrincipal(TokenCreationParameters parameters) => new();
-        public ClaimsPrincipal CreatePrincipal(LoginResult loginResult) => new();
+        public Task<ClaimsPrincipal> CreatePrincipalAsync(TokenCreationParameters parameters, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ClaimsPrincipal());
+
+        public Task<ClaimsPrincipal> CreatePrincipalAsync(LoginResult loginResult, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ClaimsPrincipal());
     }
 
     [Fact]
