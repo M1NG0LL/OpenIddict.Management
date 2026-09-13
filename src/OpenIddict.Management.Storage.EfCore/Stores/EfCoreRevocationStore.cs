@@ -212,18 +212,43 @@ public class EfCoreRevocationStore<TContext, TKey>(
     }
 
     /// <inheritdoc/>
-    public virtual async Task<Result<int>> PruneExpiredTokensAsync(CancellationToken cancellationToken = default)
+    public virtual Task<Result<int>> PruneExpiredTokensAsync(CancellationToken cancellationToken = default)
+        => PruneTokensAsync(batchSize: null, includeRevoked: true, cancellationToken);
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<int>> PruneTokensAsync(
+        int? batchSize = null,
+        bool includeRevoked = true,
+        CancellationToken cancellationToken = default)
     {
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
 
-        var expiredTokens = await Tokens
-            .Where(t => t.ExpirationDate != null && t.ExpirationDate <= nowUtc)
-            .ToListAsync(cancellationToken);
+        var query = Tokens.AsQueryable();
 
-        Tokens.RemoveRange(expiredTokens);
+        if (includeRevoked)
+        {
+            query = query.Where(t => (t.ExpirationDate != null && t.ExpirationDate <= nowUtc) || t.Status == "revoked" || t.RevokedAt != null);
+        }
+        else
+        {
+            query = query.Where(t => t.ExpirationDate != null && t.ExpirationDate <= nowUtc);
+        }
+
+        if (batchSize.HasValue && batchSize.Value > 0)
+        {
+            query = query.OrderBy(t => t.CreationDate).Take(batchSize.Value);
+        }
+
+        var tokensToDelete = await query.ToListAsync(cancellationToken);
+        if (tokensToDelete.Count == 0)
+        {
+            return 0;
+        }
+
+        Tokens.RemoveRange(tokensToDelete);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return expiredTokens.Count;
+        return tokensToDelete.Count;
     }
 
     /// <inheritdoc/>
@@ -382,6 +407,20 @@ public class EfCoreRevocationStore<TContext, TKey>(
             query = query.Where(t => t.Application != null && t.Application.ClientId == clientId);
         }
 
+        if (!string.IsNullOrWhiteSpace(filter.AuthorizationId))
+        {
+            var authId = filter.AuthorizationId.Trim();
+            if (typeof(TKey) == typeof(Guid) && Guid.TryParse(authId, out var authGuid))
+            {
+                var key = (TKey)(object)authGuid;
+                query = query.Where(t => t.Authorization != null && t.Authorization.Id != null && t.Authorization.Id.Equals(key));
+            }
+            else
+            {
+                query = query.Where(t => t.Authorization != null && t.Authorization.Id != null && t.Authorization.Id.ToString() == authId);
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
         {
             var search = filter.SearchTerm.Trim();
@@ -444,5 +483,154 @@ public class EfCoreRevocationStore<TContext, TKey>(
         }
 
         return await Tokens.FirstOrDefaultAsync(t => t.Id != null && t.Id.ToString() == tokenId, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<List<ApplicationTokenCountDto>>> GetTokenCountsByApplicationAsync(CancellationToken cancellationToken = default)
+    {
+        var appCounts = await Applications.AsNoTracking()
+            .Select(a => new ApplicationTokenCountDto
+            {
+                ApplicationId = a.Id != null ? a.Id.ToString()! : string.Empty,
+                ClientId = a.ClientId ?? string.Empty,
+                DisplayName = a.DisplayName,
+                TokenCount = a.Tokens.Count
+            })
+            .OrderByDescending(x => x.TokenCount)
+            .ToListAsync(cancellationToken);
+
+        return appCounts;
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<List<TokenTimelineDataPointDto>>> GetTokenTimelineAsync(
+        DateOnly from,
+        DateOnly to,
+        string? clientId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var startDateTime = from.ToDateTime(TimeOnly.MinValue);
+        var endDateTime = to.ToDateTime(TimeOnly.MaxValue);
+
+        var tokenQuery = Tokens.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(clientId))
+        {
+            var trimmed = clientId.Trim();
+            tokenQuery = tokenQuery.Where(t => t.Application != null && t.Application.ClientId == trimmed);
+        }
+
+        var rawDates = await tokenQuery
+            .Where(t => t.CreationDate != null && t.CreationDate >= startDateTime && t.CreationDate <= endDateTime)
+            .Select(t => t.CreationDate!.Value)
+            .ToListAsync(cancellationToken);
+
+        var countsByDate = rawDates
+            .GroupBy(d => DateOnly.FromDateTime(d.Date))
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var result = new List<TokenTimelineDataPointDto>();
+        for (var cur = from; cur <= to; cur = cur.AddDays(1))
+        {
+            result.Add(new TokenTimelineDataPointDto
+            {
+                Date = cur,
+                Count = countsByDate.GetValueOrDefault(cur, 0)
+            });
+        }
+
+        return result;
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<PagedResult<SessionListDto>>> ListSessionsAsync(
+        SessionFilterRequest filter,
+        CancellationToken cancellationToken = default)
+    {
+        filter ??= new SessionFilterRequest();
+
+        var query = Authorizations.Include(a => a.Application).AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(filter.UserId))
+        {
+            var userId = filter.UserId.Trim();
+            query = query.Where(a => a.Subject == userId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.ClientId))
+        {
+            var clientId = filter.ClientId.Trim();
+            query = query.Where(a => a.Application != null && a.Application.ClientId == clientId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
+        {
+            var search = filter.SearchTerm.Trim();
+            query = query.Where(a =>
+                (a.Subject != null && a.Subject.Contains(search)) ||
+                (a.Application != null && ((a.Application.ClientId != null && a.Application.ClientId.Contains(search)) || (a.Application.DisplayName != null && a.Application.DisplayName.Contains(search)))) ||
+                (a.Scopes != null && a.Scopes.Contains(search)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Status))
+        {
+            if (string.Equals(filter.Status, "active", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(filter.Status, "valid", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(a => a.Status != "revoked");
+            }
+            else if (string.Equals(filter.Status, "revoked", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(a => a.Status == "revoked");
+            }
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var pageIndex = filter.PageIndex < 1 ? 1 : filter.PageIndex;
+        var pageSize = filter.PageSize < 1 ? 10 : filter.PageSize;
+
+        var raw = await query
+            .OrderByDescending(a => a.CreationDate)
+            .ThenByDescending(a => a.Id)
+            .Skip((pageIndex - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new
+            {
+                Id = a.Id != null ? a.Id.ToString()! : string.Empty,
+                a.Subject,
+                ClientId = a.Application != null ? a.Application.ClientId : null,
+                ClientDisplayName = a.Application != null ? a.Application.DisplayName : null,
+                a.Status,
+                a.Scopes,
+                a.CreatedAt,
+                a.CreationDate,
+                a.LastModifiedAt,
+                TokenCount = a.Tokens.Count
+            })
+            .ToListAsync(cancellationToken);
+
+        var items = raw.Select(a => new SessionListDto
+        {
+            Id = a.Id,
+            Subject = a.Subject,
+            ClientId = a.ClientId,
+            ClientDisplayName = a.ClientDisplayName,
+            Status = a.Status,
+            Scopes = a.Scopes,
+            CreatedAt = a.CreatedAt != default
+                ? a.CreatedAt.ToUniversalTime()
+                : (a.CreationDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(a.CreationDate.Value, DateTimeKind.Utc)) : DateTimeOffset.UtcNow),
+            LastModifiedAt = a.LastModifiedAt?.ToUniversalTime(),
+            TokenCount = a.TokenCount
+        }).ToList();
+
+        return new PagedResult<SessionListDto>
+        {
+            Items = items,
+            PageIndex = pageIndex,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
     }
 }

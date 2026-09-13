@@ -53,11 +53,12 @@ builder.Services.AddOpenIddict()
         options.SetAuthorizationEndpointUris("/connect/authorize")
                .SetTokenEndpointUris("/connect/token")
                .SetIntrospectionEndpointUris("/connect/introspect")
-               .SetRevocationEndpointUris("/connect/revocation");
+               .SetRevocationEndpointUris("/connect/revocation")
+               .SetLogoutEndpointUris("/connect/logout");
 
         options.AllowAuthorizationCodeFlow()
                .AllowClientCredentialsFlow()
-               .AllowPasswordFlow
+               .AllowPasswordFlow()
                .AllowRefreshTokenFlow()
                .RequireProofKeyForCodeExchange();
 
@@ -74,7 +75,8 @@ builder.Services.AddOpenIddict()
 
         options.UseAspNetCore()
                .EnableTokenEndpointPassthrough()
-               .EnableAuthorizationEndpointPassthrough();
+               .EnableAuthorizationEndpointPassthrough()
+               .EnableLogoutEndpointPassthrough();
 
         options.SetAccessTokenLifetime(TimeSpan.FromDays(365));
         options.SetRefreshTokenLifetime(TimeSpan.FromDays(365));
@@ -126,10 +128,23 @@ using (var scope = app.Services.CreateScope())
         "https://localhost:7198/callback"
     };
 
+    var postLogoutRedirectUris = new[]
+    {
+        "https://localhost:7001/signout-callback-oidc",
+        "https://oauth.pstmn.io/v1/callback",
+        "http://localhost:5000/",
+        "https://localhost:5001/",
+        "http://localhost:5084/",
+        "https://localhost:51378/",
+        "http://localhost:51379/",
+        "https://localhost:7198/"
+    };
+
     var permissions = new[]
     {
         OpenIddictConstants.Permissions.Endpoints.Authorization,
         OpenIddictConstants.Permissions.Endpoints.Token,
+        OpenIddictConstants.Permissions.Endpoints.Logout,
         OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
         OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
         OpenIddictConstants.Permissions.ResponseTypes.Code,
@@ -149,8 +164,9 @@ using (var scope = app.Services.CreateScope())
             DisplayName = "Sample MVC Client Application",
             Environment = ApplicationEnvironment.Development,
             RedirectUris = redirectUris,
+            PostLogoutRedirectUris = postLogoutRedirectUris,
             Permissions = permissions,
-            DefaultScopes = ["openid", "profile", "email", "api_access"]
+            DefaultScopes = ["openid", "profile", "email", "api_access", "offline_access"]
         });
     }
     else
@@ -160,6 +176,7 @@ using (var scope = app.Services.CreateScope())
             DisplayName = "Sample MVC Client Application",
             Environment = ApplicationEnvironment.Development,
             RedirectUris = redirectUris,
+            PostLogoutRedirectUris = postLogoutRedirectUris,
             Permissions = permissions,
             DefaultScopes = ["openid", "profile", "email", "api_access"]
         });
@@ -385,6 +402,33 @@ app.MapPost("/connect/token", async (HttpContext httpContext) =>
 });
 
 // -----------------------------------------------------------------------------------------
+// Logout Endpoints (Local Cookie Sign-Out & OpenID Connect End-Session)
+// -----------------------------------------------------------------------------------------
+
+// GET/POST /logout: Local application logout (clears cookie session and redirects home)
+app.MapMethods("/logout", ["GET", "POST"], async (HttpContext httpContext) =>
+{
+    await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    return Results.Redirect("/");
+});
+
+// GET/POST /connect/logout: OpenIddict End-Session Endpoint (RP-initiated logout)
+app.MapMethods("/connect/logout", ["GET", "POST"], async (HttpContext httpContext) =>
+{
+    // Sign out of the ASP.NET Core cookie session
+    await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+    // Returning a SignOut result notifies OpenIddict to redirect back to post_logout_redirect_uri
+    // or fallback to the specified RedirectUri.
+    return Results.SignOut(
+        authenticationSchemes: [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme],
+        properties: new AuthenticationProperties
+        {
+            RedirectUri = "/"
+        });
+});
+
+// -----------------------------------------------------------------------------------------
 // GET /callback: MVC Callback Page displaying Token and Serialized Claims
 // -----------------------------------------------------------------------------------------
 app.MapGet("/callback", async (
@@ -544,6 +588,7 @@ app.MapGet("/callback", async (
             <div class='actions'>
                 <a class='btn' href='/'>&larr; Return Home</a>
                 <a class='btn btn-secondary' href='/admin/identity'>Go to Admin Dashboard</a>
+                <a class='btn btn-secondary' href='/logout'>Sign Out</a>
             </div>
         </div>
     </div>
@@ -552,9 +597,12 @@ app.MapGet("/callback", async (
 });
 
 // Home page
-app.MapGet("/", (HttpContext context) =>
+app.MapGet("/", async (HttpContext context) =>
 {
     var baseUrl = $"{context.Request.Scheme}://{context.Request.Host}";
+    var authResult = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    var isAuthenticated = authResult.Succeeded && authResult.Principal is not null;
+    var username = isAuthenticated ? (authResult.Principal!.FindFirst(ClaimTypes.Name)?.Value ?? "User") : null;
     
     // Generate fresh cryptographic PKCE parameters for each session
     var (verifier, challenge) = GeneratePkce();
@@ -569,6 +617,16 @@ app.MapGet("/", (HttpContext context) =>
     });
 
     var authUrl = $"/connect/authorize?client_id=sample-mvc-client&response_type=code&redirect_uri={baseUrl}/callback&code_challenge={challenge}&code_challenge_method=S256";
+
+    var authStatusBadge = isAuthenticated
+        ? $"<div style='background: #1e293b; border: 1px solid #10b981; color: #34d399; padding: 0.5rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.9rem;'>" +
+          $"Logged in as <strong>{System.Net.WebUtility.HtmlEncode(username)}</strong>" +
+          $"</div>"
+        : "";
+
+    var logoutButtonHtml = isAuthenticated
+        ? "<a class='btn btn-secondary' href='/logout'>Sign Out</a>"
+        : "";
 
     return Results.Content($@"<!DOCTYPE html>
 <html>
@@ -590,9 +648,11 @@ app.MapGet("/", (HttpContext context) =>
     <div class='card'>
         <h1>OpenIddict Management</h1>
         <p>Demonstrating custom Login Engine & View integration with OpenIddict PKCE Authorization Code flow, ExtraData token serialization, and Admin Dashboard.</p>
+        {authStatusBadge}
         <div class='buttons'>
             <a class='btn' href='{authUrl}'>Initiate PKCE Login Flow &rarr;</a>
             <a class='btn btn-secondary' href='/admin/identity'>Admin Dashboard</a>
+            {logoutButtonHtml}
         </div>
     </div>
 </body>

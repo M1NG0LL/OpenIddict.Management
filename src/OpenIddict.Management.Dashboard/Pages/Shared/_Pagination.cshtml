@@ -8,6 +8,28 @@
 
     var startPage = Math.Max(1, pageNumber - 2);
     var endPage = Math.Min(totalPages, pageNumber + 2);
+
+    string pageParam = ViewData["PageParamName"] as string ?? "pageNumber";
+
+    string BuildPageUrl(int targetPage)
+    {
+        var queryStr = Context.Request.QueryString.Value ?? string.Empty;
+        var queryDict = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(queryStr);
+        var builder = new System.Text.StringBuilder("?");
+        foreach (var kvp in queryDict)
+        {
+            if (string.Equals(kvp.Key, pageParam, StringComparison.OrdinalIgnoreCase)) continue;
+            foreach (var item in kvp.Value)
+            {
+                if (item != null)
+                {
+                    builder.Append(Uri.EscapeDataString(kvp.Key)).Append('=').Append(Uri.EscapeDataString(item)).Append('&');
+                }
+            }
+        }
+        builder.Append(Uri.EscapeDataString(pageParam)).Append('=').Append(targetPage);
+        return builder.ToString();
+    }
 }
 <div class="pagination-container">
     <div>
@@ -16,7 +38,7 @@
     <div class="pagination-controls">
         @if (hasPreviousPage)
         {
-            <a href="?pageNumber=@(pageNumber - 1)" class="btn btn-secondary btn-sm">&laquo; Prev</a>
+            <a href="@BuildPageUrl(pageNumber - 1)" class="btn btn-secondary btn-sm">&laquo; Prev</a>
         }
         else
         {
@@ -32,14 +54,14 @@
                 }
                 else
                 {
-                    <a href="?pageNumber=@p" class="page-pill">@p</a>
+                    <a href="@BuildPageUrl(p)" class="page-pill">@p</a>
                 }
             }
         </div>
 
         @if (hasNextPage)
         {
-            <a href="?pageNumber=@(pageNumber + 1)" class="btn btn-secondary btn-sm">Next &raquo;</a>
+            <a href="@BuildPageUrl(pageNumber + 1)" class="btn btn-secondary btn-sm">Next &raquo;</a>
         }
         else
         {

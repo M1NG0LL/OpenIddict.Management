@@ -79,4 +79,32 @@ public class OpenIddictDashboardService(
             ActiveAuthorizations = activeAuthorizations
         };
     }
+
+    /// <inheritdoc/>
+    public virtual async Task<List<ApplicationTokenCountDto>> GetTokenCountsByApplicationAsync(CancellationToken ct = default)
+    {
+        if (revocationManager is null)
+        {
+            return [];
+        }
+
+        var result = await revocationManager.GetTokenCountsByApplicationAsync(ct);
+        return result.IsSuccess && result.Value is not null ? result.Value : [];
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<List<TokenTimelineDataPointDto>> GetTokenTimelineAsync(
+        DateOnly from,
+        DateOnly to,
+        string? clientId = null,
+        CancellationToken ct = default)
+    {
+        if (revocationManager is null)
+        {
+            return [];
+        }
+
+        var result = await revocationManager.GetTokenTimelineAsync(from, to, clientId, ct);
+        return result.IsSuccess && result.Value is not null ? result.Value : [];
+    }
 }

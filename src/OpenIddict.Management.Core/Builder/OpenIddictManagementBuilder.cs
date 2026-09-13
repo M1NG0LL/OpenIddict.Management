@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using OpenIddict.Management.Contracts;
 using OpenIddict.Management.Models;
+using OpenIddict.Management.Options;
 using OpenIddict.Management.Services;
 using OpenIddict.Management.Validation;
 using OpenIddict.Server;
@@ -86,6 +87,23 @@ public sealed class OpenIddictManagementBuilder(IServiceCollection services)
         where TService : class, IOpenIddictTokenService
     {
         Services.Replace(ServiceDescriptor.Scoped<IOpenIddictTokenService, TService>());
+        return this;
+    }
+
+    /// <summary>
+    /// Configures the token cleanup background job and manager with custom options.
+    /// </summary>
+    /// <param name="configure">Optional configuration delegate for token cleanup options.</param>
+    /// <returns>The fluent builder instance.</returns>
+    public OpenIddictManagementBuilder AddTokenCleanup(Action<TokenCleanupOptions>? configure = null)
+    {
+        if (configure is not null)
+        {
+            Services.Configure(configure);
+        }
+
+        Services.TryAddSingleton<ITokenCleanupJobManager, TokenCleanupJobManager>();
+        Services.AddHostedService<TokenCleanupBackgroundService>();
         return this;
     }
 

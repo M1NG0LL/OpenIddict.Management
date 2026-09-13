@@ -30,6 +30,9 @@ public static class OpenIddictManagementServiceExtensions
         services.TryAddScoped<IOpenIddictLoginEngine<LoginContext>, OpenIddictLoginEngine>();
         services.TryAddScoped<IOpenIddictTokenService, OpenIddictTokenService>();
 
+        services.TryAddSingleton<ITokenCleanupJobManager, TokenCleanupJobManager>();
+        services.AddHostedService<TokenCleanupBackgroundService>();
+
         var optionsBuilder = services.AddOptions<OpenIddictManagementOptions>();
         if (configure is not null)
         {
@@ -37,5 +40,28 @@ public static class OpenIddictManagementServiceExtensions
         }
 
         return new OpenIddictManagementBuilder(services);
+    }
+
+    /// <summary>
+    /// Configures and registers the automatic token cleanup background service and manager.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Optional configuration delegate for token cleanup options.</param>
+    /// <returns>The modified service collection.</returns>
+    public static IServiceCollection AddTokenCleanup(
+        this IServiceCollection services,
+        Action<TokenCleanupOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        if (configure is not null)
+        {
+            services.Configure(configure);
+        }
+
+        services.TryAddSingleton<ITokenCleanupJobManager, TokenCleanupJobManager>();
+        services.AddHostedService<TokenCleanupBackgroundService>();
+
+        return services;
     }
 }

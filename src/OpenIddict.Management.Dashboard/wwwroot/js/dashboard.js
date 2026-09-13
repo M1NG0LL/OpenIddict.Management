@@ -32,6 +32,7 @@ document.addEventListener("DOMContentLoaded", function () {
       closeMobileSidebar();
       closeConfirmModal();
       closeTokenDrawer();
+      closeFilterDrawers();
       closeCommandPalette();
       closeAllModals();
       closeAllDropdowns();
@@ -562,3 +563,69 @@ function closeTokenDrawer() {
   if (drawer) drawer.classList.remove("show");
   if (backdrop) backdrop.classList.remove("show");
 }
+
+// ─── Filter Drawer Controls ───
+function openFilterDrawer(drawerId) {
+  const drawer = document.getElementById(drawerId);
+  const backdrop = document.getElementById(drawerId + "-backdrop");
+  if (!drawer) {
+    console.warn("Filter drawer element not found for id:", drawerId);
+    return;
+  }
+
+  drawer.classList.add("show");
+  if (backdrop) backdrop.classList.add("show");
+  document.body.classList.add("modal-open");
+
+  const firstInput = drawer.querySelector("input:not([type=hidden]), select, textarea");
+  if (firstInput) {
+    setTimeout(() => firstInput.focus(), 200);
+  }
+}
+
+function closeFilterDrawer(drawerId) {
+  const drawer = document.getElementById(drawerId);
+  const backdrop = document.getElementById(drawerId + "-backdrop");
+  if (drawer) drawer.classList.remove("show");
+  if (backdrop) backdrop.classList.remove("show");
+  document.body.classList.remove("modal-open");
+}
+
+function closeFilterDrawers() {
+  document.querySelectorAll(".filter-drawer.show").forEach((drawer) => {
+    drawer.classList.remove("show");
+  });
+  document.querySelectorAll(".filter-drawer-backdrop.show").forEach((backdrop) => {
+    backdrop.classList.remove("show");
+  });
+  document.body.classList.remove("modal-open");
+}
+
+function resetFilterForm(formId) {
+  const form = document.getElementById(formId);
+  if (!form) return;
+  form.querySelectorAll("input[type=text], input[type=date], input[type=search]").forEach(input => input.value = "");
+  form.querySelectorAll("select").forEach(select => select.selectedIndex = 0);
+  form.querySelectorAll("input[type=radio]").forEach(radio => radio.checked = (radio.value === ""));
+  form.submit();
+}
+
+// Global window assignments
+window.openFilterDrawer = openFilterDrawer;
+window.closeFilterDrawer = closeFilterDrawer;
+window.closeFilterDrawers = closeFilterDrawers;
+window.resetFilterForm = resetFilterForm;
+
+// Event delegation for filter triggers
+document.addEventListener("click", function (e) {
+  const trigger = e.target.closest(".filter-trigger-btn");
+  if (trigger) {
+    const target = trigger.getAttribute("aria-controls") || trigger.dataset.target;
+    if (target) {
+      e.preventDefault();
+      e.stopPropagation();
+      openFilterDrawer(target);
+    }
+  }
+});
+

@@ -416,6 +416,120 @@ public class DashboardPageRenderTests : IDisposable
         await app.StopAsync();
     }
 
+    [Fact]
+    public async Task OverviewPage_RendersAnalyticsChartsAndScript()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+
+        builder.Services.AddRouting();
+        builder.Services.AddDbContext<DashboardTestDbContext>(opts => opts.UseSqlite(_connection));
+        builder.Services.AddOpenIddictManagementStores<DashboardTestDbContext>();
+        builder.Services.AddOpenIddictManagement()
+            .AddDashboard(opts => opts.RequireAuthorization = false);
+
+        var app = builder.Build();
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DashboardTestDbContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
+
+        app.UseRouting();
+        app.MapOpenIddictManagementDashboard(opts => opts.RequireAuthorization = false);
+
+        await app.StartAsync();
+        var client = app.GetTestClient();
+
+        var response = await client.GetAsync("/management");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("Analytics & Token Activity");
+        content.Should().Contain("overviewAppsChart");
+        content.Should().Contain("overviewTokensChart");
+        content.Should().Contain("overviewTimelineChart");
+        content.Should().Contain("chart.umd.min.js");
+
+        await app.StopAsync();
+    }
+
+    [Fact]
+    public async Task TokensPage_RendersTabbedSessionInspectorAndCharts()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+
+        builder.Services.AddRouting();
+        builder.Services.AddDbContext<DashboardTestDbContext>(opts => opts.UseSqlite(_connection));
+        builder.Services.AddOpenIddictManagementStores<DashboardTestDbContext>();
+        builder.Services.AddOpenIddictManagement()
+            .AddDashboard(opts => opts.RequireAuthorization = false);
+
+        var app = builder.Build();
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DashboardTestDbContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
+
+        app.UseRouting();
+        app.MapOpenIddictManagementDashboard(opts => opts.RequireAuthorization = false);
+
+        await app.StartAsync();
+        var client = app.GetTestClient();
+
+        var response = await client.GetAsync("/management/Tokens?activeTab=sessions");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("Token & Session Inspector");
+        content.Should().Contain("tab-btn-tokens");
+        content.Should().Contain("tab-btn-sessions");
+        content.Should().Contain("tab-panel-sessions");
+        content.Should().Contain("tokensAppsChart");
+        content.Should().Contain("tokensBreakdownChart");
+        content.Should().Contain("tokensTimelineChart");
+        content.Should().Contain("Revoke All User Sessions");
+
+        await app.StopAsync();
+    }
+
+    [Fact]
+    public async Task OverviewPage_AjaxTimeline_ReturnsJson()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+
+        builder.Services.AddRouting();
+        builder.Services.AddDbContext<DashboardTestDbContext>(opts => opts.UseSqlite(_connection));
+        builder.Services.AddOpenIddictManagementStores<DashboardTestDbContext>();
+        builder.Services.AddOpenIddictManagement()
+            .AddDashboard(opts => opts.RequireAuthorization = false);
+
+        var app = builder.Build();
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DashboardTestDbContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
+
+        app.UseRouting();
+        app.MapOpenIddictManagementDashboard(opts => opts.RequireAuthorization = false);
+
+        await app.StartAsync();
+        var client = app.GetTestClient();
+
+        var response = await client.GetAsync("/management?handler=TokenTimeline&days=7");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
+
+        await app.StopAsync();
+    }
+
     public void Dispose()
     {
         _connection.Dispose();

@@ -3,6 +3,12 @@
 @{
     ViewData["Title"] = "Applications";
     var prefix = DashboardOptions.Value.PathPrefix.TrimEnd('/');
+    
+    int activeAppFilterCount = 0;
+    if (!string.IsNullOrWhiteSpace(Model.SearchTerm)) activeAppFilterCount++;
+    if (Model.Status.HasValue) activeAppFilterCount++;
+    if (Model.Environment.HasValue) activeAppFilterCount++;
+    bool hasActiveAppFilters = activeAppFilterCount > 0;
 }
 
 <div class="page-header">
@@ -25,31 +31,74 @@
 
 <div class="card">
     <div class="card-body" style="padding: 0;">
-        <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <form method="get" class="filter-bar" style="margin-bottom: 0;">
-                <div style="flex: 1; min-width: 200px;">
-                    <input type="text" name="SearchTerm" id="search-input" class="form-control" placeholder="Search by Client ID or Display Name..." value="@Model.SearchTerm" />
+        <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 0.85rem; flex-wrap: wrap;">
+            <form method="get" style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 240px; margin-bottom: 0;">
+                <div style="position: relative; flex: 1;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none;">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" name="SearchTerm" id="search-input" class="form-control" style="padding-left: 2.35rem;" placeholder="Search applications by Client ID or Display Name..." value="@Model.SearchTerm" />
+                    @if (Model.Status.HasValue)
+                    {
+                        <input type="hidden" name="Status" value="@Model.Status" />
+                    }
+                    @if (Model.Environment.HasValue)
+                    {
+                        <input type="hidden" name="Environment" value="@Model.Environment" />
+                    }
                 </div>
-                <div style="width: 180px;">
-                    <select name="Status" class="form-select" onchange="this.form.submit()">
-                        <option value="">All Statuses</option>
-                        @foreach (var status in Enum.GetValues<OpenIddict.Management.Enums.ApplicationStatus>())
-                        {
-                            <option value="@status" selected="@(Model.Status == status)">@status</option>
-                        }
-                    </select>
-                </div>
-                <div style="width: 180px;">
-                    <select name="Environment" class="form-select" onchange="this.form.submit()">
-                        <option value="">All Environments</option>
-                        @foreach (var env in Enum.GetValues<OpenIddict.Management.Enums.ApplicationEnvironment>())
-                        {
-                            <option value="@env" selected="@(Model.Environment == env)">@env</option>
-                        }
-                    </select>
-                </div>
+                <button type="submit" class="btn btn-secondary" style="height: 38px;">Search</button>
             </form>
+
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <!-- Circular Filter Trigger Button (Settings / Sliders Icon) -->
+                <button type="button" 
+                        class="filter-trigger-btn @(hasActiveAppFilters ? "has-filters" : "")" 
+                        id="apps-filter-trigger-btn"
+                        data-target="apps-filter-drawer"
+                        onclick="openFilterDrawer('apps-filter-drawer')" 
+                        aria-label="Open filter settings"
+                        aria-controls="apps-filter-drawer"
+                        title="Filter settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="4" y1="6" x2="20" y2="6"></line>
+                        <circle cx="8" cy="6" r="2.5" fill="currentColor"></circle>
+                        <line x1="4" y1="12" x2="20" y2="12"></line>
+                        <circle cx="16" cy="12" r="2.5" fill="currentColor"></circle>
+                        <line x1="4" y1="18" x2="20" y2="18"></line>
+                        <circle cx="10" cy="18" r="2.5" fill="currentColor"></circle>
+                    </svg>
+                    @if (hasActiveAppFilters)
+                    {
+                        <span class="filter-badge">@activeAppFilterCount</span>
+                    }
+                </button>
+            </div>
         </div>
+
+        @if (hasActiveAppFilters)
+        {
+            <div class="active-filters-bar">
+                <span class="active-filters-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                    Active filters:
+                </span>
+                @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
+                {
+                    <span class="active-filter-pill"><strong>Search:</strong> @Model.SearchTerm</span>
+                }
+                @if (Model.Status.HasValue)
+                {
+                    <span class="active-filter-pill"><strong>Status:</strong> @Model.Status</span>
+                }
+                @if (Model.Environment.HasValue)
+                {
+                    <span class="active-filter-pill"><strong>Environment:</strong> @Model.Environment</span>
+                }
+                <a href="@prefix/Applications" class="clear-all-filters-btn">Clear all</a>
+            </div>
+        }
 
         @if (Model.Applications.Items.Count == 0)
         {
@@ -278,3 +327,91 @@
         </form>
     </div>
 </div>
+
+<!-- Slide-in Filter Properties Drawer -->
+<div id="apps-filter-drawer-backdrop" class="filter-drawer-backdrop" onclick="closeFilterDrawer('apps-filter-drawer')"></div>
+<aside id="apps-filter-drawer" class="filter-drawer" role="dialog" aria-modal="true" aria-labelledby="apps-filter-drawer-title">
+    <div class="filter-drawer-header">
+        <div class="filter-drawer-title-group">
+            <div class="filter-drawer-icon-wrap">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="4" y1="6" x2="20" y2="6"></line>
+                    <circle cx="8" cy="6" r="2.5" fill="currentColor"></circle>
+                    <line x1="4" y1="12" x2="20" y2="12"></line>
+                    <circle cx="16" cy="12" r="2.5" fill="currentColor"></circle>
+                    <line x1="4" y1="18" x2="20" y2="18"></line>
+                    <circle cx="10" cy="18" r="2.5" fill="currentColor"></circle>
+                </svg>
+            </div>
+            <div>
+                <h3 id="apps-filter-drawer-title" class="filter-drawer-title">Filter Applications</h3>
+                <span class="filter-drawer-subtitle">Adjust criteria to narrow client list</span>
+            </div>
+        </div>
+        <button type="button" class="filter-drawer-close" onclick="closeFilterDrawer('apps-filter-drawer')" aria-label="Close filter drawer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+
+    <form method="get" id="apps-filter-drawer-form" class="filter-drawer-form">
+        <div class="filter-drawer-body">
+            <div class="form-group">
+                <label class="form-label" for="drawer-search-term">Search Keyword</label>
+                <input type="text" id="drawer-search-term" name="SearchTerm" class="form-control" placeholder="Search by Client ID or Display Name..." value="@Model.SearchTerm" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Application Status</label>
+                <div class="filter-chips">
+                    <label class="filter-chip">
+                        <input type="radio" name="Status" value="" checked="@(!Model.Status.HasValue)" />
+                        <span>All</span>
+                    </label>
+                    @foreach (var status in Enum.GetValues<OpenIddict.Management.Enums.ApplicationStatus>())
+                    {
+                        <label class="filter-chip">
+                            <input type="radio" name="Status" value="@status" checked="@(Model.Status == status)" />
+                            <span>@status</span>
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Environment</label>
+                <div class="filter-chips">
+                    <label class="filter-chip">
+                        <input type="radio" name="Environment" value="" checked="@(!Model.Environment.HasValue)" />
+                        <span>All</span>
+                    </label>
+                    @foreach (var env in Enum.GetValues<OpenIddict.Management.Enums.ApplicationEnvironment>())
+                    {
+                        <label class="filter-chip">
+                            <input type="radio" name="Environment" value="@env" checked="@(Model.Environment == env)" />
+                            <span>@env</span>
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="drawer-page-size">Items per Page</label>
+                <select id="drawer-page-size" name="PageSize" class="form-select">
+                    <option value="10" selected="@(Model.PageSize == 10)">10 applications</option>
+                    <option value="25" selected="@(Model.PageSize == 25)">25 applications</option>
+                    <option value="50" selected="@(Model.PageSize == 50)">50 applications</option>
+                    <option value="100" selected="@(Model.PageSize == 100)">100 applications</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="filter-drawer-footer">
+            <a href="@prefix/Applications" class="btn btn-secondary">Reset Filters</a>
+            <button type="submit" class="btn btn-primary">Apply Filters</button>
+        </div>
+    </form>
+</aside>
+

@@ -20,6 +20,9 @@ public sealed record TokenFilterRequest
     /// <summary>Gets or sets client ID filter.</summary>
     public string? ClientId { get; init; }
 
+    /// <summary>Gets or sets authorization ID filter.</summary>
+    public string? AuthorizationId { get; init; }
+
     private readonly DateTimeOffset? _createdFrom;
     private readonly DateTimeOffset? _createdTo;
 

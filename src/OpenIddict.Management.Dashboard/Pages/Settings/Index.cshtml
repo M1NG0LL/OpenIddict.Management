@@ -1,0 +1,283 @@
+@page
+@model OpenIddict.Management.Dashboard.Pages.Settings.IndexModel
+@{
+    ViewData["Title"] = "Settings";
+    var isGeneralActive = Model.ActiveTab == "general" ? "active" : "";
+    var isTokensActive = Model.ActiveTab == "general" ? "" : "active";
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Settings</h1>
+        <p class="page-subtitle">Configure background jobs, token cleanup policies, and OpenIddict management preferences.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Message))
+{
+    <div class="server-toast-data" data-message="@Model.Message" data-type="@(Model.IsSuccess ? "success" : "danger")" data-title="@(Model.IsSuccess ? "Success!" : "Action Failed")" style="display:none;"></div>
+}
+
+<!-- Tab Navigation Bar -->
+<div class="tab-bar" style="margin-bottom: 1.5rem;">
+    <button type="button" class="tab-btn @isGeneralActive" id="tab-btn-general" onclick="switchSettingsTab('general')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>General System</span>
+    </button>
+    <button type="button" class="tab-btn @isTokensActive" id="tab-btn-tokens" onclick="switchSettingsTab('tokens')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+        </svg>
+        <span>Token Cleanup &amp; Background Job</span>
+        <span class="tab-badge" style="background: @(Model.CleanupJobEnabled ? "rgba(52, 211, 153, 0.15)" : "rgba(251, 191, 36, 0.15)"); color: @(Model.CleanupJobEnabled ? "#34d399" : "#fbbf24");">
+            @(Model.CleanupJobEnabled ? "Active" : "Paused")
+        </span>
+    </button>
+</div>
+
+<!-- ============================================== -->
+<!-- TAB PANEL 1: GENERAL                           -->
+<!-- ============================================== -->
+<div id="tab-panel-general" class="tab-panel @isGeneralActive">
+    <div class="card" style="padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+        <div style="margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.25rem 0;">Dashboard &amp; API Configuration</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Current runtime configuration and environment options.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
+            <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Dashboard Title</span>
+                <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;">@Model.DashboardTitle</div>
+            </div>
+
+            <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Dashboard Path Prefix</span>
+                <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;"><code>@Model.PathPrefix</code></div>
+            </div>
+
+            <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Authorization Required</span>
+                <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;">
+                    @(Model.RequireAuthorization ? "Enabled" : "Disabled (Development)")
+                </div>
+            </div>
+
+            <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Exit URL</span>
+                <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;">
+                    @(string.IsNullOrEmpty(Model.ExitUrl) ? "None" : Model.ExitUrl)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================== -->
+<!-- TAB PANEL 2: TOKENS                            -->
+<!-- ============================================== -->
+<div id="tab-panel-tokens" class="tab-panel @isTokensActive">
+
+    <!-- Hero Status & Toggle Card -->
+    <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: flex-start; gap: 1rem; min-width: 300px; flex: 1;">
+                <div style="width: 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: @(Model.CleanupJobEnabled ? "rgba(52, 211, 153, 0.15)" : "rgba(100, 116, 139, 0.15)"); color: @(Model.CleanupJobEnabled ? "var(--success-color, #34d399)" : "var(--text-muted)");">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                </div>
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.35rem;">
+                        <h2 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary); margin: 0;">Expired &amp; Revoked Token Cleanup Job</h2>
+                        @if (Model.CleanupJobEnabled)
+                        {
+                            <span class="badge" style="background: rgba(52, 211, 153, 0.15); color: #34d399; font-weight: 500; font-size: 0.8rem; padding: 0.2rem 0.65rem; display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 9999px;">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: #34d399; animation: pulseDot 1.8s infinite;"></span>
+                                Working (Active)
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24; font-weight: 500; font-size: 0.8rem; padding: 0.2rem 0.65rem; display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 9999px;">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: #fbbf24;"></span>
+                                Paused (Inactive)
+                            </span>
+                        }
+                    </div>
+                    <p style="font-size: 0.875rem; color: var(--text-secondary); margin: 0; line-height: 1.5; max-width: 650px;">
+                        The background service periodically checks database storage and purges expired and revoked tokens up to the configured batch amount to keep database tables compact and query performance fast.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Main Toggle Button and Quick Actions -->
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <!-- Working Toggle Button -->
+                <form method="post" asp-page-handler="ToggleCleanupJob" style="display:inline; margin:0;">
+                    @if (Model.CleanupJobEnabled)
+                    {
+                        <button type="submit" class="btn btn-secondary" style="border-color: rgba(251, 191, 36, 0.4); color: var(--warning-color, #fbbf24); font-weight: 500;" title="Click to pause background cleanup job">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                            Pause Background Job
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="btn btn-primary" style="background: var(--success-color, #34d399); border-color: var(--success-color, #34d399); color: #0c1222; font-weight: 600;" title="Click to start background cleanup job">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            Start Background Job
+                        </button>
+                    }
+                </form>
+
+                <!-- Run Now Button -->
+                <form method="post" asp-page-handler="RunCleanupJobNow" style="display:inline; margin:0;">
+                    <button type="submit" class="btn btn-secondary" title="Execute a cleanup cycle right now on-demand">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Run Now
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Live Statistics Row -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color);">
+            <div>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Dynamic Amount</span>
+                <div style="font-size: 1.2rem; font-weight: 700; color: var(--accent-primary, #818cf8); margin-top: 0.2rem;">
+                    @Model.CleanupJobBatchSize <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary);">tokens / run</span>
+                </div>
+            </div>
+            <div>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Run Frequency</span>
+                <div style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;">
+                    @(Model.CleanupJobIntervalMinutes >= 60 ? (Model.CleanupJobIntervalMinutes / 60) + " hour(s)" : Model.CleanupJobIntervalMinutes + " minute(s)")
+                </div>
+            </div>
+            <div>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Last Run</span>
+                <div style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;">
+                    @(Model.CleanupJobLastRun.HasValue ? Model.CleanupJobLastRun.Value.ToString("g") : "Never")
+                </div>
+            </div>
+            <div>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Last Cleared</span>
+                <div style="font-size: 1.2rem; font-weight: 700; color: var(--warning-color, #fbbf24); margin-top: 0.2rem;">
+                    @Model.CleanupJobLastPrunedCount <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary);">tokens</span>
+                </div>
+            </div>
+            <div>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Total Cleared</span>
+                <div style="font-size: 1.2rem; font-weight: 700; color: var(--success-color, #34d399); margin-top: 0.2rem;">
+                    @Model.CleanupJobTotalPrunedCount <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary);">tokens</span>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.CleanupJobLastError))
+        {
+            <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: var(--danger-bg, rgba(248, 113, 113, 0.15)); border: 1px solid rgba(248, 113, 113, 0.3); border-radius: var(--radius-sm); color: var(--danger-color, #f87171); font-size: 0.85rem;">
+                <strong>Last execution error:</strong> @Model.CleanupJobLastError
+            </div>
+        }
+    </div>
+
+    <!-- Configure Dynamic Amount & Policies Form Card -->
+    <div class="card" style="padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+        <div style="margin-bottom: 1.25rem;">
+            <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.25rem 0;">Dynamic Pruning Amount &amp; Policies</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Adjust the batch amount and execution frequency. Changes take effect immediately without restarting the host.</p>
+        </div>
+
+        <form method="post" asp-page-handler="UpdateCleanupJobSettings">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                <!-- Dynamic Batch Amount Field -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="settings-batch-size">
+                        Prune Amount (Batch Limit)
+                        <span style="color: var(--accent-primary, #818cf8); font-size: 0.8rem; font-weight: normal; margin-left: 0.35rem;">Tokens to clear per execution cycle</span>
+                    </label>
+                    <input type="number" name="batchSize" id="settings-batch-size" class="form-control" value="@Model.CleanupJobBatchSize" min="1" max="100000" required />
+                    
+                    <!-- Quick Presets -->
+                    <div style="display: flex; align-items: center; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">Presets:</span>
+                        <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.55rem;" onclick="document.getElementById('settings-batch-size').value = 50;">50</button>
+                        <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.55rem;" onclick="document.getElementById('settings-batch-size').value = 100;">100</button>
+                        <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.55rem;" onclick="document.getElementById('settings-batch-size').value = 250;">250</button>
+                        <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.55rem;" onclick="document.getElementById('settings-batch-size').value = 500;">500</button>
+                        <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.55rem;" onclick="document.getElementById('settings-batch-size').value = 1000;">1,000</button>
+                        <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.55rem;" onclick="document.getElementById('settings-batch-size').value = 5000;">5,000</button>
+                    </div>
+                </div>
+
+                <!-- Run Interval Field -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="settings-interval-select">Run Frequency (Interval)</label>
+                    <select name="intervalMinutes" id="settings-interval-select" class="form-select">
+                        <option value="15" selected="@(Model.CleanupJobIntervalMinutes == 15)">Every 15 minutes</option>
+                        <option value="30" selected="@(Model.CleanupJobIntervalMinutes == 30)">Every 30 minutes</option>
+                        <option value="60" selected="@(Model.CleanupJobIntervalMinutes == 60)">Every 1 hour</option>
+                        <option value="180" selected="@(Model.CleanupJobIntervalMinutes == 180)">Every 3 hours</option>
+                        <option value="360" selected="@(Model.CleanupJobIntervalMinutes == 360)">Every 6 hours</option>
+                        <option value="720" selected="@(Model.CleanupJobIntervalMinutes == 720)">Every 12 hours</option>
+                        <option value="1440" selected="@(Model.CleanupJobIntervalMinutes == 1440)">Every 24 hours</option>
+                    </select>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.4rem;">How frequently the background worker triggers a cleanup pass.</span>
+                </div>
+            </div>
+
+            <!-- Target Scope Checkbox -->
+            <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
+                <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                    <input type="checkbox" name="includeRevoked" value="true" checked="@Model.CleanupJobIncludeRevoked" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                    <div>
+                        <strong style="color: var(--text-primary); font-size: 0.9rem;">Include Revoked Tokens in Cleanup</strong>
+                        <p style="margin: 0.15rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                            When checked, the job cleans both expired tokens and explicitly revoked tokens. When unchecked, only expired tokens are cleared.
+                        </p>
+                    </div>
+                </label>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1.5rem;">
+                    Save Token Settings
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function switchSettingsTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+
+            const activeBtn = document.getElementById('tab-btn-' + tabName);
+            const activePanel = document.getElementById('tab-panel-' + tabName);
+
+            if (activeBtn) activeBtn.classList.add('active');
+            if (activePanel) activePanel.classList.add('active');
+
+            const url = new URL(window.location);
+            url.searchParams.set('activeTab', tabName);
+            window.history.replaceState({}, '', url);
+        }
+    </script>
+}

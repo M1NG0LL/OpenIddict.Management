@@ -66,6 +66,53 @@
     </div>
 </div>
 
+<div class="analytics-section" style="margin-bottom: 2rem;">
+    <div class="section-title-group" style="margin-bottom: 1rem;">
+        <h2 class="section-title" style="font-size: 1.15rem;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 0.35rem; color: var(--accent-primary, #6366f1);">
+                <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+                <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+            </svg>
+            Analytics & Token Activity
+        </h2>
+    </div>
+
+    <div class="chart-grid">
+    <div class="chart-card">
+        <div class="chart-card-header">
+            <div class="chart-card-title">Applications Distribution</div>
+        </div>
+        <div class="chart-canvas-container" style="height: 260px;">
+            <canvas id="overviewAppsChart"></canvas>
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-card-header">
+            <div class="chart-card-title">Tokens Breakdown</div>
+        </div>
+        <div class="chart-canvas-container" style="height: 260px;">
+            <canvas id="overviewTokensChart"></canvas>
+        </div>
+    </div>
+</div>
+
+    <div class="chart-card chart-card-full" style="margin-top: 1.25rem;">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;">
+            <select id="overview-timeline-range" class="form-select form-select-sm" style="width: auto; padding: 0.25rem 0.65rem; font-size: 0.8rem;" onchange="onOverviewTimelineRangeChange(this.value)">
+                <option value="7">Last 7 days</option>
+                <option value="14">Last 14 days</option>
+                <option value="30" selected>Last 30 days</option>
+                <option value="60">Last 60 days</option>
+                <option value="90">Last 90 days</option>
+            </select>
+        </div>
+        <div class="chart-canvas-container" style="position: relative; height: 230px;">
+            <canvas id="overviewTimelineChart"></canvas>
+        </div>
+    </div>
+</div>
+
 <div class="section-title-group">
     <h2 class="section-title">Quick Actions</h2>
     <p class="section-subtitle">Common operations and identity management shortcuts</p>
@@ -96,8 +143,8 @@
             </div>
             <span class="action-card-arrow">↗</span>
         </div>
-        <div class="action-card-title">Token Inspector</div>
-        <p class="action-card-desc">Search, filter, inspect, and perform single or bulk token revocations.</p>
+        <div class="action-card-title">Token & Session Inspector</div>
+        <p class="action-card-desc">Search, filter, inspect, and manage tokens and active sessions with revocation tools.</p>
     </a>
 
     <a href="@prefix/Scopes" class="action-card">
@@ -113,3 +160,264 @@
         <p class="action-card-desc">Define authorization scopes and assign resource server permissions.</p>
     </a>
 </div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script>
+        (function() {
+            const rawAppData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AppTokenCounts));
+            const rawTimelineData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TokenTimeline));
+
+            const palette = [
+                '#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ec4899',
+                '#8b5cf6', '#14b8a6', '#3b82f6', '#f97316', '#e11d48',
+                '#84cc16', '#a855f7', '#0ea5e9', '#d946ef', '#64748b'
+            ];
+
+            let selectedClientId = null;
+            let currentRangeDays = 30;
+
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+
+            // 1. Applications Pie Chart
+            const appLabels = rawAppData.map(a => a.DisplayName || a.ClientId || 'App');
+            const appClientIds = rawAppData.map(a => a.ClientId);
+            const appColors = rawAppData.map((_, i) => palette[i % palette.length]);
+            // Slice size proportional to application presence or token weight
+            const appValues = rawAppData.map(a => Math.max(1, a.TokenCount));
+
+            const appsCtx = document.getElementById('overviewAppsChart');
+            const appsChart = appsCtx ? new Chart(appsCtx, {
+                type: 'pie',
+                data: {
+                    labels: appLabels,
+                    datasets: [{
+                        data: appValues,
+                        backgroundColor: appColors,
+                        borderColor: isDark ? '#1e293b' : '#ffffff',
+                        borderWidth: 2,
+                        hoverOffset: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: textColor,
+                                boxWidth: 12,
+                                padding: 10,
+                                font: { size: 11, family: 'Inter' }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const app = rawAppData[context.dataIndex];
+                                    return ` ${app.DisplayName || app.ClientId}: ${app.TokenCount} tokens`;
+                                }
+                            }
+                        }
+                    },
+                    onClick: function(evt, elements) {
+                        if (elements && elements.length > 0) {
+                            const idx = elements[0].index;
+                            const app = rawAppData[idx];
+                            if (selectedClientId === app.ClientId) {
+                                resetOverviewChartFilter();
+                            } else {
+                                applyAppFilter(app.ClientId, app.DisplayName || app.ClientId);
+                            }
+                        }
+                    }
+                }
+            }) : null;
+
+            // 2. Tokens Doughnut Chart
+            const tokenCounts = rawAppData.map(a => a.TokenCount);
+            const tokensCtx = document.getElementById('overviewTokensChart');
+            const tokensChart = tokensCtx ? new Chart(tokensCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: appLabels,
+                    datasets: [{
+                        data: tokenCounts.length > 0 ? tokenCounts : [0],
+                        backgroundColor: appColors,
+                        borderColor: isDark ? '#1e293b' : '#ffffff',
+                        borderWidth: 2,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '62%',
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: textColor,
+                                boxWidth: 12,
+                                padding: 10,
+                                font: { size: 11, family: 'Inter' }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const app = rawAppData[context.dataIndex];
+                                    const total = tokenCounts.reduce((s, c) => s + c, 0);
+                                    const pct = total > 0 ? Math.round((app.TokenCount / total) * 100) : 0;
+                                    return ` ${app.DisplayName || app.ClientId}: ${app.TokenCount} tokens (${pct}%)`;
+                                }
+                            }
+                        }
+                    },
+                    onClick: function(evt, elements) {
+                        if (elements && elements.length > 0) {
+                            const idx = elements[0].index;
+                            const app = rawAppData[idx];
+                            if (selectedClientId === app.ClientId) {
+                                resetOverviewChartFilter();
+                            } else {
+                                applyAppFilter(app.ClientId, app.DisplayName || app.ClientId);
+                            }
+                        }
+                    }
+                }
+            }) : null;
+
+            // 3. Timeline Line/Area Chart
+            const timelineCtx = document.getElementById('overviewTimelineChart');
+            const timelineLabels = rawTimelineData.map(d => {
+                const parts = d.Date.split('-');
+                return parts.length === 3 ? `${parts[1]}/${parts[2]}` : d.Date;
+            });
+            const timelineValues = rawTimelineData.map(d => d.Count);
+
+            const timelineChart = timelineCtx ? new Chart(timelineCtx, {
+                type: 'line',
+                data: {
+                    labels: timelineLabels,
+                    datasets: [{
+                        label: 'Tokens Created',
+                        data: timelineValues,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 3,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#6366f1',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function(items) {
+                                    return items[0]?.label || '';
+                                },
+                                label: function(item) {
+                                    return ` Tokens Created: ${item.parsed.y}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { size: 10, family: 'Inter' } }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textColor,
+                                font: { size: 10, family: 'Inter' },
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            }) : null;
+
+            window.applyAppFilter = function(clientId, appName) {
+                selectedClientId = clientId;
+
+                const idx = appClientIds.indexOf(clientId);
+                if (idx >= 0) {
+                    const bgColors = appColors.map((c, i) => i === idx ? c : 'rgba(100, 116, 139, 0.2)');
+                    if (appsChart) {
+                        appsChart.data.datasets[0].backgroundColor = bgColors;
+                        appsChart.update();
+                    }
+                    if (tokensChart) {
+                        tokensChart.data.datasets[0].backgroundColor = bgColors;
+                        tokensChart.update();
+                    }
+                }
+
+                // Fetch filtered timeline
+                fetchTimelineData(clientId, currentRangeDays);
+            };
+
+            window.resetOverviewChartFilter = function() {
+                selectedClientId = null;
+
+                if (appsChart) {
+                    appsChart.data.datasets[0].backgroundColor = [...appColors];
+                    appsChart.update();
+                }
+                if (tokensChart) {
+                    tokensChart.data.datasets[0].backgroundColor = [...appColors];
+                    tokensChart.update();
+                }
+
+                // Fetch unfiltered timeline
+                fetchTimelineData(null, currentRangeDays);
+            };
+
+            window.onOverviewTimelineRangeChange = function(days) {
+                currentRangeDays = parseInt(days, 10) || 30;
+                fetchTimelineData(selectedClientId, currentRangeDays);
+            };
+
+            function fetchTimelineData(clientId, days) {
+                let url = '?handler=TokenTimeline&days=' + days;
+                if (clientId) {
+                    url += '&clientId=' + encodeURIComponent(clientId);
+                }
+
+                fetch(url)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (!timelineChart || !Array.isArray(data)) return;
+
+                        const labels = data.map(d => {
+                            const parts = d.date.split('-');
+                            return parts.length === 3 ? `${parts[1]}/${parts[2]}` : d.date;
+                        });
+                        const values = data.map(d => d.count);
+
+                        timelineChart.data.labels = labels;
+                        timelineChart.data.datasets[0].data = values;
+                        timelineChart.update();
+                    })
+                    .catch(err => console.error('Failed to fetch timeline data:', err));
+            }
+        })();
+    </script>
+}

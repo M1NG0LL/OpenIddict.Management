@@ -10,10 +10,28 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@title - OpenIddict Management</title>
-    <link rel="stylesheet" href="/_content/OpenIddict.Management.Dashboard/css/dashboard.css" />
+    <link rel="stylesheet" href="/_content/OpenIddict.Management.Dashboard/css/dashboard.css" asp-append-version="true" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .filter-drawer-backdrop {
+            position: fixed; inset: 0; background: rgba(12, 18, 34, 0.65);
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            z-index: 1040; opacity: 0; visibility: hidden; pointer-events: none;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+        .filter-drawer-backdrop.show { opacity: 1; visibility: visible; pointer-events: auto; }
+        .filter-drawer {
+            position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 440px;
+            background-color: var(--bg-secondary, #141c2e); border-left: 1px solid var(--border-color, #334155);
+            box-shadow: -10px 0 35px rgba(0, 0, 0, 0.5); z-index: 1050; display: flex; flex-direction: column;
+            transform: translateX(100%); transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1); will-change: transform;
+        }
+        .filter-drawer.show { transform: translateX(0) !important; }
+        .filter-trigger-btn { cursor: pointer; pointer-events: auto; }
+        .filter-trigger-btn * { pointer-events: none; }
+    </style>
 </head>
 <body>
     <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
@@ -98,9 +116,9 @@
                     <span>Applications List</span>
                     <span class="command-item-shortcut">Jump to</span>
                 </div>
-                <div class="command-item" data-url="@prefix/Tokens" data-title="Token Inspector">
+                <div class="command-item" data-url="@prefix/Tokens" data-title="Token & Session Inspector">
                     <svg class="command-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
-                    <span>Token Inspector & Revocation</span>
+                    <span>Token &amp; Session Inspector</span>
                     <span class="command-item-shortcut">Jump to</span>
                 </div>
                 <div class="command-item" data-url="@prefix/Scopes" data-title="Scope Manager">
@@ -154,7 +172,58 @@
     <div id="toast-container" class="toast-container"></div>
     <partial name="_ConfirmDialog" />
 
-    <script src="/_content/OpenIddict.Management.Dashboard/js/dashboard.js"></script>
+    <script src="/_content/OpenIddict.Management.Dashboard/js/dashboard.js" asp-append-version="true"></script>
+    <script>
+        // Guaranteed immediate drawer handler (fallback for browser HTTP cache)
+        window.openFilterDrawer = window.openFilterDrawer || function (drawerId) {
+            var drawer = document.getElementById(drawerId);
+            var backdrop = document.getElementById(drawerId + "-backdrop");
+            if (!drawer) {
+                console.warn("Filter drawer element not found for id:", drawerId);
+                return;
+            }
+            drawer.classList.add("show");
+            if (backdrop) backdrop.classList.add("show");
+            document.body.classList.add("modal-open");
+            var firstInput = drawer.querySelector("input:not([type=hidden]), select, textarea");
+            if (firstInput) setTimeout(function () { firstInput.focus(); }, 200);
+        };
+
+        window.closeFilterDrawer = window.closeFilterDrawer || function (drawerId) {
+            var drawer = document.getElementById(drawerId);
+            var backdrop = document.getElementById(drawerId + "-backdrop");
+            if (drawer) drawer.classList.remove("show");
+            if (backdrop) backdrop.classList.remove("show");
+            document.body.classList.remove("modal-open");
+        };
+
+        window.closeFilterDrawers = window.closeFilterDrawers || function () {
+            document.querySelectorAll(".filter-drawer.show").forEach(function (d) { d.classList.remove("show"); });
+            document.querySelectorAll(".filter-drawer-backdrop.show").forEach(function (b) { b.classList.remove("show"); });
+            document.body.classList.remove("modal-open");
+        };
+
+        window.resetFilterForm = window.resetFilterForm || function (formId) {
+            var form = document.getElementById(formId);
+            if (!form) return;
+            form.querySelectorAll("input[type=text], input[type=date], input[type=search]").forEach(function(i) { i.value = ""; });
+            form.querySelectorAll("select").forEach(function(s) { s.selectedIndex = 0; });
+            form.querySelectorAll("input[type=radio]").forEach(function(r) { r.checked = (r.value === ""); });
+            form.submit();
+        };
+
+        document.addEventListener("click", function (e) {
+            var trigger = e.target.closest(".filter-trigger-btn");
+            if (trigger) {
+                var target = trigger.getAttribute("aria-controls") || trigger.dataset.target;
+                if (target) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openFilterDrawer(target);
+                }
+            }
+        });
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

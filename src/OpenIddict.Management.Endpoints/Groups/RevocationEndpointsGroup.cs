@@ -60,9 +60,14 @@ internal static class RevocationEndpointsGroup
 
         revocationGroup.MapPost("/prune", async (
             IOpenIddictRevocationManager manager,
+            int? batchSize,
+            bool? includeRevoked,
             CancellationToken cancellationToken) =>
         {
-            var result = await manager.PruneExpiredTokensAsync(cancellationToken);
+            var result = await manager.PruneTokensAsync(
+                batchSize: batchSize,
+                includeRevoked: includeRevoked ?? true,
+                cancellationToken: cancellationToken);
             return result.ToHttpResult(count => HttpResults.Ok(new { PrunedTokensCount = count }));
         })
         .WithName("PruneExpiredTokens")
