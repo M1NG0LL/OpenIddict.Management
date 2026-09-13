@@ -27,7 +27,7 @@ internal static class ApplicationEndpointsGroup
             [FromQuery(Name = "status")] ApplicationStatus? status = null,
             [FromQuery(Name = "environment")] ApplicationEnvironment? environment = null,
             [FromQuery(Name = "tags")] string[]? tags = null,
-            IApplicationManagementService service = null!,
+            [FromServices] IApplicationManagementService service = null!,
             CancellationToken cancellationToken = default) =>
         {
             var request = new PagedRequest
@@ -50,7 +50,7 @@ internal static class ApplicationEndpointsGroup
 
         appGroup.MapGet("/{id}", async (
             string id,
-            IApplicationManagementService service,
+            [FromServices] IApplicationManagementService service,
             CancellationToken cancellationToken) =>
         {
             var result = await service.GetByIdAsync(id, cancellationToken);
@@ -64,7 +64,7 @@ internal static class ApplicationEndpointsGroup
 
         appGroup.MapPost("/", async (
             [FromBody] ApplicationCreateDto dto,
-            IApplicationManagementService service,
+            [FromServices] IApplicationManagementService service,
             CancellationToken cancellationToken) =>
         {
             var result = await service.CreateAsync(dto, cancellationToken);
@@ -80,7 +80,7 @@ internal static class ApplicationEndpointsGroup
         appGroup.MapPut("/{id}", async (
             string id,
             [FromBody] ApplicationUpdateDto dto,
-            IApplicationManagementService service,
+            [FromServices] IApplicationManagementService service,
             CancellationToken cancellationToken) =>
         {
             var result = await service.UpdateAsync(id, dto, cancellationToken);
@@ -96,7 +96,7 @@ internal static class ApplicationEndpointsGroup
         appGroup.MapDelete("/{id}", async (
             string id,
             [FromQuery] bool hard = false,
-            IApplicationManagementService service = null!,
+            [FromServices] IApplicationManagementService service = null!,
             CancellationToken cancellationToken = default) =>
         {
             var result = await service.DeleteAsync(id, hard, cancellationToken);
@@ -111,7 +111,7 @@ internal static class ApplicationEndpointsGroup
         appGroup.MapPatch("/{id}/status", async (
             string id,
             [FromQuery] ApplicationStatus status,
-            IApplicationManagementService service,
+            [FromServices] IApplicationManagementService service,
             CancellationToken cancellationToken) =>
         {
             var result = await service.UpdateStatusAsync(id, status, cancellationToken);
@@ -126,7 +126,7 @@ internal static class ApplicationEndpointsGroup
         appGroup.MapPost("/{id}/secret", async (
             string id,
             [FromBody] UpdateClientSecretRequest request,
-            IApplicationManagementService service,
+            [FromServices] IApplicationManagementService service,
             CancellationToken cancellationToken) =>
         {
             var result = await service.UpdateClientSecretAsync(id, request.ClientSecret, cancellationToken);
@@ -138,6 +138,20 @@ internal static class ApplicationEndpointsGroup
         .Produces(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status404NotFound);
+
+        appGroup.MapPost("/bulk-status", async (
+            [FromBody] BulkUpdateApplicationStatusRequest request,
+            [FromServices] IApplicationManagementService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.SetStatusByEnvironmentAsync(request.Environment, request.Status, cancellationToken);
+            return result.ToHttpResult(count => HttpResults.Ok(new { UpdatedCount = count }));
+        })
+        .WithName("BulkUpdateApplicationStatus")
+        .WithSummary("Bulk update application operational status")
+        .WithDescription("Updates the operational status (Active, Disabled, Deleted) for all applications within a specified environment, or across all environments if not specified.")
+        .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status400BadRequest);
 
         return appGroup;
     }

@@ -66,6 +66,9 @@ public static class OpenIddictEndpointRouteBuilderExtensions
         group.MapTokenEndpoints();
         group.MapRevocationEndpoints();
         group.MapScopeEndpoints();
+        group.MapSessionEndpoints();
+        group.MapOverviewEndpoints();
+        group.MapCleanupEndpoints();
 
         return group;
     }

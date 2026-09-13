@@ -69,6 +69,26 @@ public class TokenAndRevocationEndpointsTests : IDisposable
         var tokenResponse = await client.DeleteAsync($"/api/management/tokens/{Guid.NewGuid()}");
         tokenResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
+        // List tokens
+        var listTokensResponse = await client.GetAsync("/api/management/tokens?pageIndex=1&pageSize=10");
+        listTokensResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Token counts
+        var countsResponse = await client.GetAsync("/api/management/tokens/counts");
+        countsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Revoke filtered tokens
+        var revokeFilteredResponse = await client.PostAsJsonAsync("/api/management/tokens/revoke-filtered", new TokenFilterRequest { UserId = "user-123" });
+        revokeFilteredResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Token timeline
+        var timelineResponse = await client.GetAsync("/api/management/tokens/timeline");
+        timelineResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Tokens by application
+        var byAppResponse = await client.GetAsync("/api/management/tokens/by-application");
+        byAppResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
         await app.StopAsync();
     }
 

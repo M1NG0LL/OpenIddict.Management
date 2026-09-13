@@ -1,7 +1,7 @@
-namespace OpenIddict.Management.Dashboard.Services;
+namespace OpenIddict.Management.Dto;
 
 /// <summary>
-/// Overview metrics for the OpenIddict Management Dashboard.
+/// Overview metrics for the OpenIddict Management Dashboard and API.
 /// </summary>
 public sealed record DashboardOverviewDto
 {

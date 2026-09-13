@@ -204,6 +204,7 @@ app.MapOpenIddictManagementEndpoints(options =>
 | `DELETE` | `/{id}?hard=false` | `DeleteApplication` | Soft/hard delete → 204 or 404 |
 | `PATCH` | `/{id}/status?status=Active` | `UpdateApplicationStatus` | Update status → 204 or 404 |
 | `POST` | `/{id}/secret` | `UpdateClientSecret` | Update client secret |
+| `POST` | `/bulk-status` | `BulkUpdateApplicationStatus` | Bulk update status by environment |
 
 ### Scope Endpoints (`/api/management/scopes`)
 
@@ -220,7 +221,33 @@ app.MapOpenIddictManagementEndpoints(options =>
 
 | Method | Route | Name | Description |
 |---|---|---|---|
+| `GET` | `/` | `ListTokens` | Paginated list with filters: `search`, `userId`, `clientId`, `authorizationId`, `status`, `tokenType`, `createdFrom`, `createdTo` |
+| `GET` | `/counts` | `GetTokenCounts` | Aggregate token counts (valid, revoked, expired, total) |
+| `GET` | `/timeline` | `GetTokenTimeline` | Daily token creation counts over a date range |
+| `GET` | `/by-application` | `GetTokensByApplication` | Token counts grouped by application |
+| `POST` | `/revoke-filtered` | `RevokeFilteredTokens` | Bulk revoke tokens matching filter criteria |
 | `DELETE` | `/{id}` | `RevokeTokenById` | Revoke single token by ID |
+
+### Session Endpoints (`/api/management/sessions`)
+
+| Method | Route | Name | Description |
+|---|---|---|---|
+| `GET` | `/` | `ListSessions` | Paginated list of session authorizations with filters: `search`, `userId`, `clientId`, `status` |
+
+### Overview Endpoints (`/api/management/overview`)
+
+| Method | Route | Name | Description |
+|---|---|---|---|
+| `GET` | `/` | `GetDashboardOverview` | System overview metrics (active/total apps, scopes, tokens, authorizations) |
+
+### Cleanup Job Endpoints (`/api/management/cleanup`)
+
+| Method | Route | Name | Description |
+|---|---|---|---|
+| `GET` | `/` | `GetCleanupJobStatus` | Telemetry, state, interval, batch size, and cumulative metrics |
+| `POST` | `/toggle?enabled={bool}` | `ToggleCleanupJob` | Enable, pause, or toggle background cleanup worker |
+| `PUT` | `/settings` | `UpdateCleanupJobSettings` | Update batch size, interval schedule, and includeRevoked flag |
+| `POST` | `/run` | `RunCleanupJobNow` | Trigger an immediate synchronous cleanup pass |
 
 ### Revocation Endpoints (`/api/management/revocation`)
 

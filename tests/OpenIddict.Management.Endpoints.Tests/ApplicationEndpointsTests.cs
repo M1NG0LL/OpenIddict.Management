@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OpenIddict.Management.Dto;
 using OpenIddict.Management.Endpoints.Extensions;
+using OpenIddict.Management.Enums;
 using OpenIddict.Management.Models;
 using OpenIddict.Management.Storage.EfCore.Entities;
 using OpenIddict.Management.Storage.EfCore.Extensions;
@@ -153,6 +154,59 @@ public class ApplicationEndpointsTests : IDisposable
         var content = await response.Content.ReadAsStringAsync();
         content.Should().Contain("ClientId");
         content.Should().Contain("cannot contain whitespace");
+
+        await app.StopAsync();
+    }
+
+    [Fact]
+    public async Task BulkUpdateApplicationStatus_UpdatesMatchingApplications()
+    {
+        // Arrange
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddRouting();
+        builder.Services.AddDbContext<TestDbContext>(opts => opts.UseSqlite(_connection));
+        builder.Services.AddOpenIddictManagementStores<TestDbContext>();
+
+        var app = builder.Build();
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
+
+        app.MapOpenIddictManagementEndpoints(opts => opts.RequireAuthorization = false);
+
+        await app.StartAsync();
+        var client = app.GetTestClient();
+
+        var createDto = new ApplicationCreateDto
+        {
+            ClientId = "bulk-test-client",
+            DisplayName = "Bulk Test App",
+            Environment = ApplicationEnvironment.Staging
+        };
+
+        var createResponse = await client.PostAsJsonAsync("/api/management/applications", createDto);
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // Act - bulk set staging to disabled
+        var bulkRequest = new BulkUpdateApplicationStatusRequest
+        {
+            Environment = ApplicationEnvironment.Staging,
+            Status = ApplicationStatus.Disabled
+        };
+
+        var bulkResponse = await client.PostAsJsonAsync("/api/management/applications/bulk-status", bulkRequest);
+        bulkResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Assert - verify app is disabled
+        var listResponse = await client.GetAsync("/api/management/applications?status=Disabled");
+        listResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var pagedResult = await listResponse.Content.ReadFromJsonAsync<PagedResult<ApplicationListDto>>();
+        pagedResult.Should().NotBeNull();
+        pagedResult!.Items.Should().ContainSingle(a => a.ClientId == "bulk-test-client");
 
         await app.StopAsync();
     }

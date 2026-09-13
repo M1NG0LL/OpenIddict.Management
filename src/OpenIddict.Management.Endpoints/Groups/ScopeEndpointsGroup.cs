@@ -23,7 +23,7 @@ internal static class ScopeEndpointsGroup
             [FromQuery(Name = "search")] string? search = null,
             [FromQuery(Name = "sortBy")] string? sortBy = null,
             [FromQuery(Name = "sortDescending")] bool sortDescending = false,
-            IScopeManagementService service = null!,
+            [FromServices] IScopeManagementService service = null!,
             CancellationToken cancellationToken = default) =>
         {
             var request = new PagedRequest
@@ -45,7 +45,7 @@ internal static class ScopeEndpointsGroup
 
         scopeGroup.MapGet("/{id}", async (
             string id,
-            IScopeManagementService service,
+            [FromServices] IScopeManagementService service,
             CancellationToken cancellationToken) =>
         {
             var result = await service.GetByIdAsync(id, cancellationToken);
@@ -59,7 +59,7 @@ internal static class ScopeEndpointsGroup
 
         scopeGroup.MapGet("/by-name/{name}", async (
             string name,
-            IScopeManagementService service,
+            [FromServices] IScopeManagementService service,
             CancellationToken cancellationToken) =>
         {
             var result = await service.GetByNameAsync(name, cancellationToken);
@@ -73,7 +73,7 @@ internal static class ScopeEndpointsGroup
 
         scopeGroup.MapPost("/", async (
             [FromBody] CreateScopeRequest request,
-            IScopeManagementService service,
+            [FromServices] IScopeManagementService service,
             CancellationToken cancellationToken) =>
         {
             var result = await service.CreateAsync(request.Name, request.DisplayName, request.Description, request.Resources, cancellationToken);
@@ -89,7 +89,7 @@ internal static class ScopeEndpointsGroup
         scopeGroup.MapPut("/{id}", async (
             string id,
             [FromBody] UpdateScopeRequest request,
-            IScopeManagementService service,
+            [FromServices] IScopeManagementService service,
             CancellationToken cancellationToken) =>
         {
             var result = await service.UpdateAsync(id, request.DisplayName, request.Description, request.Resources, cancellationToken);
@@ -104,7 +104,7 @@ internal static class ScopeEndpointsGroup
 
         scopeGroup.MapDelete("/{id}", async (
             string id,
-            IScopeManagementService service,
+            [FromServices] IScopeManagementService service,
             CancellationToken cancellationToken) =>
         {
             var result = await service.DeleteAsync(id, cancellationToken);
