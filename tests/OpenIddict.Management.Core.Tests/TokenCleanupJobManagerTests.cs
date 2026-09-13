@@ -19,14 +19,14 @@ public class TokenCleanupJobManagerTests
         var scopeFactory = Substitute.For<IServiceScopeFactory>();
         var manager = new TokenCleanupJobManager(scopeFactory);
 
-        manager.IsEnabled.Should().BeTrue();
+        manager.IsEnabled.Should().BeFalse();
         manager.BatchSize.Should().Be(100);
-        manager.Interval.Should().Be(TimeSpan.FromHours(1));
+        manager.Interval.Should().Be(TimeSpan.FromHours(24));
         manager.IncludeRevoked.Should().BeTrue();
         manager.LastRunTime.Should().BeNull();
         manager.LastPrunedCount.Should().Be(0);
         manager.TotalPrunedCount.Should().Be(0);
-        manager.LastStatus.Should().Be("Idle");
+        manager.LastStatus.Should().Be("Paused");
         manager.LastError.Should().BeNull();
     }
 
@@ -123,7 +123,8 @@ public class TokenCleanupJobManagerTests
         var serviceProvider = services.BuildServiceProvider();
 
         var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
-        var manager = new TokenCleanupJobManager(scopeFactory);
+        var options = Microsoft.Extensions.Options.Options.Create(new TokenCleanupOptions { IsEnabled = true });
+        var manager = new TokenCleanupJobManager(scopeFactory, options);
 
         var prunedCount = await manager.RunJobCycleAsync(serviceProvider);
 
