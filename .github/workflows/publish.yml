@@ -1,0 +1,59 @@
+name: Publish to NuGet
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (pack only, do not push to NuGet)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-and-publish:
+    name: Build, Pack & Publish
+    runs-on: ubuntu-latest
+    environment: nuget-deployment
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDKs
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution (Release)
+        run: dotnet build -c Release --no-restore
+
+      - name: Run tests
+        run: |
+          dotnet test tests/OpenIddict.Management.Core.Tests/OpenIddict.Management.Core.Tests.csproj -c Release --no-build
+          dotnet test tests/OpenIddict.Management.Endpoints.Tests/OpenIddict.Management.Endpoints.Tests.csproj -c Release --no-build
+          dotnet test tests/OpenIddict.Management.Storage.EfCore.Tests/OpenIddict.Management.Storage.EfCore.Tests.csproj -c Release --no-build
+          dotnet test tests/OpenIddict.Management.Dashboard.Tests/OpenIddict.Management.Dashboard.Tests.csproj -c Release --no-build
+
+      - name: Pack NuGet packages
+        run: dotnet pack -c Release -o ./artifacts
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./artifacts/*
+
+      - name: Push packages to NuGet.org
+        if: ${{ !inputs.dry_run }}
+        run: dotnet nuget push "./artifacts/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

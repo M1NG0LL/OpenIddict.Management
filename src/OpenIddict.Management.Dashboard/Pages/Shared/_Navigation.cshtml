@@ -1,8 +1,19 @@
 @using OpenIddict.Management.Dashboard
+@using System.Reflection
 @inject Microsoft.Extensions.Options.IOptions<DashboardOptions> Options
 @{
     var prefix = Options.Value.PathPrefix.TrimEnd('/');
     var currentPath = Context.Request.Path.Value ?? string.Empty;
+    var rawVersion = typeof(DashboardOptions).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+        ?.InformationalVersion?
+        .Split('+')[0];
+
+    var packageVersion = !string.IsNullOrWhiteSpace(rawVersion)
+        ? rawVersion.TrimStart('v')
+        : typeof(DashboardOptions).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+
+    packageVersion = $"v{packageVersion}";
 }
 <nav class="sidebar-nav">
     <div>
@@ -68,7 +79,7 @@
             </a>
         }
         <div class="sidebar-footer-info" style="margin-top: @(!string.IsNullOrWhiteSpace(Options.Value.ExitUrl) ? "0.75rem" : "0");">
-            <span class="sidebar-footer-version">v1.0.0</span>
+            <span class="sidebar-footer-version">@packageVersion</span>
             <a href="https://documentation.openiddict.com/" target="_blank" rel="noopener noreferrer" class="sidebar-footer-link">
                 <span>Docs</span>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>

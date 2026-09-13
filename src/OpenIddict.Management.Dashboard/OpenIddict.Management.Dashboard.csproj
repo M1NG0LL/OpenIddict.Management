@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
+    <Description>Embedded Razor Class Library admin dashboard UI for managing OpenIddict applications, scopes, authorizations, and tokens.</Description>
+    <PackageTags>openiddict;identity;dashboard;admin;ui;razor-pages;aspnetcore;management</PackageTags>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
     <StaticWebAssetsEnabled>true</StaticWebAssetsEnabled>
   </PropertyGroup>
@@ -12,6 +14,10 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenIddict.Management.Core\OpenIddict.Management.Core.csproj" />
     <ProjectReference Include="..\OpenIddict.Management.Endpoints\OpenIddict.Management.Endpoints.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\images\" />
   </ItemGroup>
 
 </Project>
