@@ -1,15 +1,71 @@
 @page
 @model OpenIddict.Management.Dashboard.Pages.Settings.IndexModel
+@using OpenIddict.Abstractions
+@using OpenIddict.Management.Dashboard.Helpers
 @{
     ViewData["Title"] = "Settings";
-    var isGeneralActive = Model.ActiveTab == "general" ? "active" : "";
-    var isTokensActive = Model.ActiveTab == "general" ? "" : "active";
+    var currentTab = (Model.ActiveTab ?? "general").ToLowerInvariant();
+    if (currentTab != "general" && currentTab != "oidc" && currentTab != "tokens")
+    {
+        currentTab = "general";
+    }
+    var isGeneralActive = currentTab == "general" ? "active" : "";
+    var isOidcActive = currentTab == "oidc" ? "active" : "";
+    var isTokensActive = currentTab == "tokens" ? "active" : "";
 }
+
+<style>
+    .info-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        cursor: help;
+        transition: color 0.15s ease, transform 0.15s ease;
+        vertical-align: middle;
+        margin-left: 0.35rem;
+    }
+    .info-icon:hover {
+        color: var(--accent-primary, #818cf8);
+        transform: scale(1.1);
+    }
+    .info-icon svg {
+        pointer-events: none;
+    }
+    .flow-dep-badge {
+        display: none;
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: #f87171;
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        border-radius: 4px;
+        padding: 0.1rem 0.45rem;
+        margin-left: 0.35rem;
+        letter-spacing: 0.01em;
+        vertical-align: middle;
+    }
+    .flow-dep-container {
+        transition: opacity 0.2s ease;
+    }
+    .flow-dep-container.is-disabled {
+        opacity: 0.45;
+    }
+    .flow-dep-container.is-disabled input,
+    .flow-dep-container.is-disabled select {
+        cursor: not-allowed;
+    }
+    .flow-dep-container.is-disabled button {
+        pointer-events: none;
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+</style>
 
 <div class="page-header">
     <div>
         <h1 class="page-title">Settings</h1>
-        <p class="page-subtitle">Configure background jobs, token cleanup policies, and OpenIddict management preferences.</p>
+        <p class="page-subtitle">Configure runtime OpenID Connect options, background jobs, token pruning policies, and management preferences.</p>
     </div>
 </div>
 
@@ -18,7 +74,7 @@
     <div class="server-toast-data" data-message="@Model.Message" data-type="@(Model.IsSuccess ? "success" : "danger")" data-title="@(Model.IsSuccess ? "Success!" : "Action Failed")" style="display:none;"></div>
 }
 
-<!-- Tab Navigation Bar -->
+<!-- Tab Navigation Bar: General -> OIDC -> Tokens -->
 <div class="tab-bar" style="margin-bottom: 1.5rem;">
     <button type="button" class="tab-btn @isGeneralActive" id="tab-btn-general" onclick="switchSettingsTab('general')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -26,6 +82,16 @@
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
         </svg>
         <span>General System</span>
+    </button>
+    <button type="button" class="tab-btn @isOidcActive" id="tab-btn-oidc" onclick="switchSettingsTab('oidc')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <span>OIDC Server Configuration</span>
+        <span class="tab-badge" style="background: @(Model.IsServerConfigured ? "rgba(52, 211, 153, 0.15)" : "rgba(148, 163, 184, 0.15)"); color: @(Model.IsServerConfigured ? "#34d399" : "#94a3b8");">
+            @(Model.IsServerConfigured ? "Active" : "Not Found")
+        </span>
     </button>
     <button type="button" class="tab-btn @isTokensActive" id="tab-btn-tokens" onclick="switchSettingsTab('tokens')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -47,30 +113,50 @@
 <div id="tab-panel-general" class="tab-panel @isGeneralActive">
     <div class="card" style="padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
         <div style="margin-bottom: 1.5rem;">
-            <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.25rem 0;">Dashboard &amp; API Configuration</h3>
-            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Current runtime configuration and environment options.</p>
+            <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.25rem 0;">Dashboard &amp; Management Configuration</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Current runtime configuration and environment options for this management portal.</p>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
             <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Dashboard Title</span>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                    Dashboard Title
+                    <span class="info-icon" title="Display title used in the browser tab and dashboard navbar header.">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    </span>
+                </span>
                 <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;">@Model.DashboardTitle</div>
             </div>
 
             <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Dashboard Path Prefix</span>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                    Dashboard Path Prefix
+                    <span class="info-icon" title="The URL route prefix where this dashboard is mapped in the ASP.NET Core application.">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    </span>
+                </span>
                 <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;"><code>@Model.PathPrefix</code></div>
             </div>
 
             <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Authorization Required</span>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                    Authorization Required
+                    <span class="info-icon" title="Specifies whether users must authenticate before accessing the dashboard portal.">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    </span>
+                </span>
                 <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;">
                     @(Model.RequireAuthorization ? "Enabled" : "Disabled (Development)")
                 </div>
             </div>
 
             <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">Exit URL</span>
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                    Exit URL
+                    <span class="info-icon" title="Target URL where users are redirected when clicking Exit Dashboard in the navigation.">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    </span>
+                </span>
                 <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;">
                     @(string.IsNullOrEmpty(Model.ExitUrl) ? "None" : Model.ExitUrl)
                 </div>
@@ -80,7 +166,772 @@
 </div>
 
 <!-- ============================================== -->
-<!-- TAB PANEL 2: TOKENS                            -->
+<!-- TAB PANEL 2: OIDC SERVER CONFIGURATION         -->
+<!-- ============================================== -->
+<div id="tab-panel-oidc" class="tab-panel @isOidcActive">
+    @if (!Model.IsServerConfigured)
+    {
+        <div class="card" style="padding: 2rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); text-align: center;">
+            <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(251, 191, 36, 0.15); color: #fbbf24; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto;">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            </div>
+            <h3 style="color: var(--text-primary); font-size: 1.15rem; font-weight: 600; margin-bottom: 0.5rem;">OpenIddict Server Not Detected</h3>
+            <p style="color: var(--text-secondary); max-width: 550px; margin: 0 auto; font-size: 0.9rem; line-height: 1.5;">
+                OpenIddict Server options were not found in dependency injection. To enable dynamic OIDC configuration, make sure <code>services.AddOpenIddict().AddServer(...)</code> is registered in your application startup.
+            </p>
+        </div>
+    }
+    else
+    {
+        <!-- Section 1: Static Endpoints (Read-Only) -->
+        <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem;">
+                        <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin: 0;">Server Endpoints &amp; Discovery</h3>
+                        <span class="badge" style="background: var(--bg-elevated); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;">
+                            Static / Startup Bound
+                        </span>
+                    </div>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">
+                        Endpoint routes are bound to ASP.NET Core routing at application startup and cannot be changed dynamically.
+                    </p>
+                </div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    @if (!string.IsNullOrEmpty(Model.DiscoveryEndpointUrl))
+                    {
+                        <a href="@Model.DiscoveryEndpointUrl" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 500;" title="Open OpenID Connect Discovery document in new tab">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            <span>Open .well-known Discovery</span>
+                        </a>
+                    }
+                    @if (!string.IsNullOrEmpty(Model.JwksEndpointUrl))
+                    {
+                        <a href="@Model.JwksEndpointUrl" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 500;" title="Open JSON Web Key Set in new tab">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            <span>Open JWKS Key Set</span>
+                        </a>
+                    }
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+                <div style="padding: 0.85rem 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                        Issuer URI
+                        <span class="info-icon" title="The unique OpenID Connect issuer identifier (iss) included in issued tokens and discovery documents.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </span>
+                    <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem; word-break: break-all;">
+                        @(string.IsNullOrEmpty(Model.OidcIssuer) ? "Dynamic (Relative to Host Request)" : Model.OidcIssuer)
+                    </div>
+                </div>
+
+                <div style="padding: 0.85rem 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                        Authorization Endpoint
+                        <span class="info-icon" title="Endpoint where users are redirected by client apps to log in and grant consent.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </span>
+                    <div style="font-weight: 600; color: var(--accent-primary, #818cf8); margin-top: 0.25rem;">
+                        @(Model.AuthorizationEndpointUris.Count > 0 ? string.Join(", ", Model.AuthorizationEndpointUris) : "Not Configured")
+                    </div>
+                </div>
+
+                <div style="padding: 0.85rem 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                        Token Endpoint
+                        <span class="info-icon" title="Backchannel endpoint where client applications request access tokens and refresh tokens.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </span>
+                    <div style="font-weight: 600; color: var(--accent-primary, #818cf8); margin-top: 0.25rem;">
+                        @(Model.TokenEndpointUris.Count > 0 ? string.Join(", ", Model.TokenEndpointUris) : "Not Configured")
+                    </div>
+                </div>
+
+                <div style="padding: 0.85rem 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                        Introspection Endpoint
+                        <span class="info-icon" title="RFC 7662 endpoint where resource servers and APIs can validate and inspect opaque or reference tokens.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </span>
+                    <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;">
+                        @(Model.IntrospectionEndpointUris.Count > 0 ? string.Join(", ", Model.IntrospectionEndpointUris) : "Not Configured")
+                    </div>
+                </div>
+
+                <div style="padding: 0.85rem 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                        Revocation Endpoint
+                        <span class="info-icon" title="RFC 7009 endpoint allowing client apps to immediately invalidate access or refresh tokens upon sign-out.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </span>
+                    <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;">
+                        @(Model.RevocationEndpointUris.Count > 0 ? string.Join(", ", Model.RevocationEndpointUris) : "Not Configured")
+                    </div>
+                </div>
+
+                <div style="padding: 0.85rem 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                        Logout / End-Session Endpoint
+                        <span class="info-icon" title="OpenID Connect RP-Initiated Logout endpoint for terminating active user sessions.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </span>
+                    <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;">
+                        @(Model.LogoutEndpointUris.Count > 0 ? string.Join(", ", Model.LogoutEndpointUris) : "Not Configured")
+                    </div>
+                </div>
+
+                <div style="padding: 0.85rem 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                        UserInfo Endpoint
+                        <span class="info-icon" title="Protected identity endpoint returning claims (sub, name, email, profile) about the authenticated user.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </span>
+                    <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;">
+                        @(Model.UserinfoEndpointUris.Count > 0 ? string.Join(", ", Model.UserinfoEndpointUris) : "Not Configured")
+                    </div>
+                </div>
+
+                <div style="padding: 0.85rem 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                            OIDC Discovery (.well-known)
+                            <span class="info-icon" title="Public RFC 8414 discovery JSON document advertising all active endpoints, signing keys, and supported scopes.">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            </span>
+                        </span>
+                        @if (!string.IsNullOrEmpty(Model.DiscoveryEndpointUrl))
+                        {
+                            <a href="@Model.DiscoveryEndpointUrl" target="_blank" rel="noopener noreferrer" style="font-size: 0.75rem; color: var(--accent-primary, #818cf8); text-decoration: underline;">View Live &rarr;</a>
+                        }
+                    </div>
+                    <div style="font-weight: 600; color: var(--text-primary); margin-top: 0.25rem;">
+                        @(Model.ConfigurationEndpointUris.Count > 0 ? string.Join(", ", Model.ConfigurationEndpointUris) : "/.well-known/openid-configuration")
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form for Dynamic OIDC Configuration -->
+        <form method="post" asp-page-handler="UpdateOidcSettings" id="oidc-config-form">
+            
+            <!-- Section 2: OAuth 2.0 & OpenID Connect Flows (Grant Types) -->
+            <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                <div style="margin-bottom: 1.25rem;">
+                    <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.25rem 0;">
+                        Allowed OAuth 2.0 &amp; OpenID Connect Flows
+                        <span class="info-icon" title="Enable or disable protocol grant types at runtime. Tokens will only be issued for checked flows.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Enable or disable protocol grant types at runtime. Changes apply to subsequent token requests immediately.</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="allowAuthCode" id="flow-authCode" value="true" checked="@Model.AllowAuthorizationCodeFlow" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Authorization Code Flow
+                                    <span class="info-icon" title="Standard interactive login flow with browser redirect. Combined with PKCE, this is the recommended flow for SPAs, mobile, and web applications.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <code style="font-size: 0.75rem; color: var(--accent-primary, #818cf8); display: block;">authorization_code</code>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Standard interactive user login flow for modern web, single-page, desktop, and mobile applications.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="allowClientCreds" id="flow-clientCreds" value="true" checked="@Model.AllowClientCredentialsFlow" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Client Credentials Flow
+                                    <span class="info-icon" title="Machine-to-machine authentication without user interaction. Used by background daemons, microservices, and scheduled tasks.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <code style="font-size: 0.75rem; color: var(--accent-primary, #818cf8); display: block;">client_credentials</code>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Direct machine-to-machine server communication without user interaction or browser redirection.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="allowRefreshToken" id="flow-refreshToken" value="true" checked="@Model.AllowRefreshTokenFlow" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Refresh Token Flow
+                                    <span class="info-icon" title="Enables clients to obtain fresh access tokens when previous tokens expire without requiring user re-authentication.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <code style="font-size: 0.75rem; color: var(--accent-primary, #818cf8); display: block;">refresh_token</code>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Allows clients to seamlessly exchange refresh tokens for renewed access tokens without re-authenticating the user.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="allowPassword" id="flow-password" value="true" checked="@Model.AllowPasswordFlow" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Resource Owner Password Flow
+                                    <span class="info-icon" title="Legacy flow exchanging direct username and password for tokens. Deprecated by OAuth 2.1; use only for legacy migrations.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <code style="font-size: 0.75rem; color: var(--accent-primary, #818cf8); display: block;">password</code>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Legacy flow exchanging username and password directly. Use only for trusted legacy migrations.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="allowImplicit" id="flow-implicit" value="true" checked="@Model.AllowImplicitFlow" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Implicit Flow
+                                    <span class="info-icon" title="Legacy client-side flow returning tokens directly in URL fragment. Deprecated due to token leakage risks; use Auth Code with PKCE instead.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <code style="font-size: 0.75rem; color: var(--accent-primary, #818cf8); display: block;">implicit</code>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Legacy client-side flow returning tokens directly from authorization endpoint. Deprecated by OAuth 2.1.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="allowDeviceCode" id="flow-deviceCode" value="true" checked="@Model.AllowDeviceCodeFlow" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Device Authorization Flow
+                                    <span class="info-icon" title="RFC 8628 flow for input-constrained devices (smart TVs, CLI tools, IoT) authorizing via a secondary browser.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <code style="font-size: 0.75rem; color: var(--accent-primary, #818cf8); display: block;">urn:ietf:params:oauth:grant-type:device_code</code>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Allows limited-input devices (smart TVs, consoles, CLI tools) to authorize via a secondary browser.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="customGrantTypes">
+                        Additional Custom Grant Types (comma or space separated)
+                        <span class="info-icon" title="Register custom grant type URIs or identifiers supported by your custom OpenIddict handlers.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </label>
+                    <input type="text" name="customGrantTypes" id="customGrantTypes" class="form-control" value="@Model.CustomGrantTypes" placeholder="e.g. urn:ietf:params:oauth:grant-type:token-exchange, custom_grant" />
+                </div>
+            </div>
+
+            <!-- Section 3: Token Lifetimes & Leeway -->
+            <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                <div style="margin-bottom: 1.25rem;">
+                    <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.25rem 0;">
+                        Token Lifetimes &amp; Expiration Windows
+                        <span class="info-icon" title="Configure dynamic validity lifetimes for issued access tokens, refresh tokens, authorization codes, and identity tokens.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Configure dynamic validity lifetimes for issued access tokens, refresh tokens, authorization codes, and identity tokens.</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1rem;">
+                    <!-- Access Token Lifetime -->
+                    <div class="form-group flow-dep-container" id="group-accessTokenMinutes" style="margin-bottom: 0;">
+                        <label class="form-label" for="accessTokenMinutes" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                            <span>
+                                Access Token Lifetime (Minutes)
+                                <span class="info-icon" title="Validity duration of issued access tokens. Shorter lifespans (15 to 60 mins) minimize risk if a token is intercepted.">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                </span>
+                                <span id="badge-accessTokenMinutes" class="flow-dep-badge">Requires Active Flow</span>
+                            </span>
+                            <span style="color: var(--accent-primary, #818cf8); font-size: 0.75rem; font-weight: normal; margin-left: 0.35rem;">
+                                @Model.AccessTokenLifetimeDescription
+                            </span>
+                        </label>
+                        <input type="number" step="any" name="accessTokenMinutes" id="accessTokenMinutes" class="form-control" value="@Model.AccessTokenLifetimeMinutes" min="1" placeholder="e.g. 60" />
+                        <div style="display: flex; gap: 0.35rem; margin-top: 0.4rem; flex-wrap: wrap;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); align-self: center;">Presets:</span>
+                            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;" onclick="document.getElementById('accessTokenMinutes').value = 60;">1 hour</button>
+                            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;" onclick="document.getElementById('accessTokenMinutes').value = 1440;">24 hours</button>
+                            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;" onclick="document.getElementById('accessTokenMinutes').value = 525600;">365 days</button>
+                        </div>
+                    </div>
+
+                    <!-- Refresh Token Lifetime -->
+                    <div class="form-group flow-dep-container" id="group-refreshTokenDays" style="margin-bottom: 0;">
+                        <label class="form-label" for="refreshTokenDays" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                            <span>
+                                Refresh Token Lifetime (Days)
+                                <span class="info-icon" title="Validity duration of refresh tokens. Controls how long users remain logged in across sessions before needing to log in again.">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                </span>
+                                <span id="badge-refreshTokenDays" class="flow-dep-badge">Requires Refresh Token Flow</span>
+                            </span>
+                            <span style="color: var(--accent-primary, #818cf8); font-size: 0.75rem; font-weight: normal; margin-left: 0.35rem;">
+                                @Model.RefreshTokenLifetimeDescription
+                            </span>
+                        </label>
+                        <input type="number" step="any" name="refreshTokenDays" id="refreshTokenDays" class="form-control" value="@Model.RefreshTokenLifetimeDays" min="0.1" placeholder="e.g. 14" />
+                        <div style="display: flex; gap: 0.35rem; margin-top: 0.4rem; flex-wrap: wrap;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); align-self: center;">Presets:</span>
+                            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;" onclick="document.getElementById('refreshTokenDays').value = 7;">7 days</button>
+                            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;" onclick="document.getElementById('refreshTokenDays').value = 30;">30 days</button>
+                            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;" onclick="document.getElementById('refreshTokenDays').value = 365;">365 days</button>
+                        </div>
+                    </div>
+
+                    <!-- Authorization Code Lifetime -->
+                    <div class="form-group flow-dep-container" id="group-authCodeMinutes" style="margin-bottom: 0;">
+                        <label class="form-label" for="authCodeMinutes" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                            <span>
+                                Auth Code Lifetime (Minutes)
+                                <span class="info-icon" title="Time window a client application has to exchange an issued authorization code for tokens. Default is 5 minutes.">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                </span>
+                                <span id="badge-authCodeMinutes" class="flow-dep-badge">Requires Auth Code Flow</span>
+                            </span>
+                            <span style="color: var(--accent-primary, #818cf8); font-size: 0.75rem; font-weight: normal; margin-left: 0.35rem;">
+                                @Model.AuthorizationCodeLifetimeDescription
+                            </span>
+                        </label>
+                        <input type="number" step="any" name="authCodeMinutes" id="authCodeMinutes" class="form-control" value="@Model.AuthorizationCodeLifetimeMinutes" min="1" placeholder="e.g. 5" />
+                        <div style="display: flex; gap: 0.35rem; margin-top: 0.4rem; flex-wrap: wrap;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); align-self: center;">Presets:</span>
+                            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;" onclick="document.getElementById('authCodeMinutes').value = 5;">5 mins</button>
+                            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;" onclick="document.getElementById('authCodeMinutes').value = 10;">10 mins</button>
+                            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;" onclick="document.getElementById('authCodeMinutes').value = 30;">30 mins</button>
+                        </div>
+                    </div>
+
+                    <!-- Identity Token Lifetime -->
+                    <div class="form-group flow-dep-container" id="group-identityTokenMinutes" style="margin-bottom: 0;">
+                        <label class="form-label" for="identityTokenMinutes" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                            <span>
+                                Identity Token Lifetime (Minutes)
+                                <span class="info-icon" title="Validity duration of OpenID Connect ID tokens (id_token) containing authenticated user profile claims. Default is 20 minutes.">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                </span>
+                                <span id="badge-identityTokenMinutes" class="flow-dep-badge">Requires Auth Code or Implicit Flow</span>
+                            </span>
+                            <span style="color: var(--accent-primary, #818cf8); font-size: 0.75rem; font-weight: normal; margin-left: 0.35rem;">
+                                @Model.IdentityTokenLifetimeDescription
+                            </span>
+                        </label>
+                        <input type="number" step="any" name="identityTokenMinutes" id="identityTokenMinutes" class="form-control" value="@Model.IdentityTokenLifetimeMinutes" min="1" placeholder="e.g. 20" />
+                    </div>
+
+                    <!-- Device Code Lifetime -->
+                    <div class="form-group flow-dep-container" id="group-deviceCodeMinutes" style="margin-bottom: 0;">
+                        <label class="form-label" for="deviceCodeMinutes" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                            <span>
+                                Device Code Lifetime (Minutes)
+                                <span class="info-icon" title="Time window a user has to enter the verification code on the device authorization page. Default is 10 minutes.">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                </span>
+                                <span id="badge-deviceCodeMinutes" class="flow-dep-badge">Requires Device Authorization Flow</span>
+                            </span>
+                            <span style="color: var(--accent-primary, #818cf8); font-size: 0.75rem; font-weight: normal; margin-left: 0.35rem;">
+                                @Model.DeviceCodeLifetimeDescription
+                            </span>
+                        </label>
+                        <input type="number" step="any" name="deviceCodeMinutes" id="deviceCodeMinutes" class="form-control" value="@Model.DeviceCodeLifetimeMinutes" min="1" placeholder="e.g. 10" />
+                    </div>
+
+                    <!-- Refresh Token Reuse Leeway -->
+                    <div class="form-group flow-dep-container" id="group-reuseLeewaySeconds" style="margin-bottom: 0;">
+                        <label class="form-label" for="reuseLeewaySeconds" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                            <span>
+                                Refresh Token Reuse Leeway (Seconds)
+                                <span class="info-icon" title="Grace period allowing a previously consumed refresh token to be redeemed again, preventing race conditions from concurrent network requests.">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                </span>
+                                <span id="badge-reuseLeewaySeconds" class="flow-dep-badge">Requires Refresh Token Flow</span>
+                            </span>
+                            <span style="color: var(--accent-primary, #818cf8); font-size: 0.75rem; font-weight: normal; margin-left: 0.35rem;">
+                                @Model.RefreshTokenReuseLeewayDescription
+                            </span>
+                        </label>
+                        <input type="number" step="any" name="reuseLeewaySeconds" id="reuseLeewaySeconds" class="form-control" value="@Model.RefreshTokenReuseLeewaySeconds" min="0" placeholder="e.g. 0 or 30" />
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.35rem;">Grace period to prevent race conditions during concurrent refresh token requests.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 4: Registered Scopes (Collapsible Selector + Manual Input) -->
+            <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                    <div>
+                        <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.25rem 0;">
+                            Registered Scopes &amp; Discovery Metadata
+                            <span class="info-icon" title="Scopes recognized by the OpenIddict server engine and advertised in the /.well-known/openid-configuration discovery document.">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            </span>
+                        </h3>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">
+                            Scopes recognized by the OpenIddict server engine and advertised in the <code>/.well-known/openid-configuration</code> discovery document.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="selectAllStandardScopes()">Select Standard Scopes</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="clearAllRegisteredScopes()">Clear All</button>
+                    </div>
+                </div>
+
+                <!-- Active scopes summary pills -->
+                <div style="margin-bottom: 1.25rem; padding: 0.75rem 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">
+                        Effective Registered Scopes:
+                    </span>
+                    <div id="active-scopes-pills" style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
+                        @if (Model.SelectedRegisteredScopes.Count == 0)
+                        {
+                            <span style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">No scopes currently registered.</span>
+                        }
+                        else
+                        {
+                            @foreach (var s in Model.SelectedRegisteredScopes)
+                            {
+                                <span class="badge" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--accent-primary, #818cf8); font-size: 0.8rem; padding: 0.25rem 0.65rem; border-radius: 9999px;">
+                                    @s
+                                </span>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <!-- Collapsible Scope Catalog Container (Similar to Create Client Application) -->
+                <div id="scopes-catalog-container" style="display: block; margin-bottom: 1.5rem;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem;">
+                        <!-- Standard OIDC Scopes Card -->
+                        <div style="background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem;">
+                            <h4 style="font-size: 0.95rem; color: var(--accent-primary, #818cf8); margin-bottom: 0.75rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+                                <span>
+                                    Standard OpenID Connect Scopes
+                                    <span class="info-icon" title="Core standard specification scopes including openid, profile, email, phone, address, and offline_access.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </span>
+                                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">Core Specifications</span>
+                            </h4>
+                            <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                                @foreach (var scope in OpenIddictPermissionCatalog.StandardScopes)
+                                {
+                                    var isChecked = Model.SelectedRegisteredScopes.Contains(scope.Name, StringComparer.OrdinalIgnoreCase);
+                                    <label style="display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer; font-size: 0.85rem; user-select: none;">
+                                        <input type="checkbox" name="selectedScopes" value="@scope.Name" class="registered-scope-checkbox standard-scope-checkbox" checked="@isChecked" onchange="updateActiveScopePills()" style="margin-top: 0.2rem; cursor: pointer; accent-color: var(--accent-primary, #818cf8);" />
+                                        <div>
+                                            <div style="font-weight: 500; color: var(--text-primary);">
+                                                @scope.DisplayName <code style="font-size: 0.75rem; opacity: 0.8;">(@scope.Name)</code>
+                                            </div>
+                                            <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.3;">@scope.Description</div>
+                                        </div>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Custom / Database Scopes Card -->
+                        @if (Model.DatabaseScopes.Count > 0)
+                        {
+                            <div style="background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem;">
+                                <h4 style="font-size: 0.95rem; color: var(--accent-primary, #818cf8); margin-bottom: 0.75rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+                                    <span>
+                                        Database Configured Scopes
+                                        <span class="info-icon" title="Custom application-level scopes configured in the database via the Scope Manager.">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                        </span>
+                                    </span>
+                                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">From Scope Manager</span>
+                                </h4>
+                                <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                                    @foreach (var scope in Model.DatabaseScopes)
+                                    {
+                                        var isChecked = Model.SelectedRegisteredScopes.Contains(scope.Name, StringComparer.OrdinalIgnoreCase);
+                                        <label style="display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer; font-size: 0.85rem; user-select: none;">
+                                            <input type="checkbox" name="selectedScopes" value="@scope.Name" class="registered-scope-checkbox custom-scope-checkbox" checked="@isChecked" onchange="updateActiveScopePills()" style="margin-top: 0.2rem; cursor: pointer; accent-color: var(--accent-primary, #818cf8);" />
+                                            <div>
+                                                <div style="font-weight: 500; color: var(--text-primary);">
+                                                    @(string.IsNullOrWhiteSpace(scope.DisplayName) ? scope.Name : scope.DisplayName)
+                                                    <code style="font-size: 0.75rem; opacity: 0.8;">(@scope.Name)</code>
+                                                </div>
+                                                @if (!string.IsNullOrWhiteSpace(scope.Description))
+                                                {
+                                                    <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.3;">@scope.Description</div>
+                                                }
+                                            </div>
+                                        </label>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Manual Input for Custom Registered Scopes -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="customScopesText">
+                        Additional Custom Registered Scopes (comma or space separated)
+                        <span class="info-icon" title="Type any additional custom scopes directly. They will be registered alongside the selections above and published in metadata.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </label>
+                    <input type="text" name="customScopesText" id="customScopesText" class="form-control" oninput="updateActiveScopePills()" placeholder="e.g. api, api_access, billing_read, inventory_manage" />
+                    <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.35rem;">
+                        Type any additional custom scopes directly. They will be registered alongside the selections above.
+                    </span>
+                </div>
+            </div>
+
+            <!-- Section 5: Security, Encryption & Token Storage Policies -->
+            <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                <div style="margin-bottom: 1.25rem;">
+                    <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.25rem 0;">
+                        Security, Token Storage &amp; Enforcement Policies
+                        <span class="info-icon" title="Manage PKCE requirements, token encryption algorithms, reference tokens, and database persistence settings.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Manage PKCE requirements, token encryption algorithms, reference tokens, and database persistence settings.</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem;">
+                    <!-- PKCE Enforcement -->
+                    <div class="flow-dep-container" id="group-requirePkce" style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="requirePkce" id="policy-requirePkce" value="true" checked="@Model.RequireProofKeyForCodeExchange" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Require Proof Key for Code Exchange (PKCE)
+                                    <span class="info-icon" title="Forces all authorization code requests to provide a cryptographic code_challenge and code_verifier to stop code interception attacks. Mandatory in OAuth 2.1.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                    <span id="badge-requirePkce" class="flow-dep-badge">Requires Auth Code Flow</span>
+                                </strong>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Forces all authorization code requests to provide a cryptographic <code>code_challenge</code>. Required by OAuth 2.1.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Access Token Encryption Toggle -->
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="disableTokenEncryption" id="policy-disableTokenEncryption" value="true" checked="@Model.DisableAccessTokenEncryption" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Disable Access Token Encryption (Emit Signed JWT)
+                                    <span class="info-icon" title="When checked, access tokens are emitted as unencrypted signed JWTs rather than ASP.NET Data Protection encrypted tokens so external APIs can validate signatures.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    When checked, access tokens are emitted as unencrypted signed JWTs rather than ASP.NET Data Protection encrypted tokens.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Reference Access Tokens -->
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="useRefAccessTokens" id="policy-useRefAccessTokens" value="true" checked="@Model.UseReferenceAccessTokens" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Use Reference Access Tokens
+                                    <span class="info-icon" title="Persists access tokens in the database table and emits compact identifier handles. Allows on-demand instant revocation of access tokens.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Persists access tokens in the database table and emits compact identifier handles. Allows on-demand revocation of access tokens.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Reference Refresh Tokens -->
+                    <div class="flow-dep-container" id="group-useRefRefreshTokens" style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="useRefRefreshTokens" id="policy-useRefRefreshTokens" value="true" checked="@Model.UseReferenceRefreshTokens" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Use Reference Refresh Tokens
+                                    <span class="info-icon" title="Persists refresh tokens in the database store, ensuring immediate server-side revocation tracking.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                    <span id="badge-useRefRefreshTokens" class="flow-dep-badge">Requires Refresh Token Flow</span>
+                                </strong>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Persists refresh tokens in the database store, ensuring immediate server-side revocation tracking.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Disable Rolling Refresh Tokens -->
+                    <div class="flow-dep-container" id="group-disableRollingRefresh" style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="disableRollingRefresh" id="policy-disableRollingRefresh" value="true" checked="@Model.DisableRollingRefreshTokens" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Disable Rolling Refresh Tokens
+                                    <span class="info-icon" title="Prevents issuing a brand new refresh token each time an access token is refreshed, keeping the initial token handle.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                    <span id="badge-disableRollingRefresh" class="flow-dep-badge">Requires Refresh Token Flow</span>
+                                </strong>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Prevents issuing a brand new refresh token each time an access token is refreshed.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Disable Sliding Refresh Expiration -->
+                    <div class="flow-dep-container" id="group-disableSlidingRefresh" style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="disableSlidingRefresh" id="policy-disableSlidingRefresh" value="true" checked="@Model.DisableSlidingRefreshTokenExpiration" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Disable Sliding Expiration for Refresh Tokens
+                                    <span class="info-icon" title="Maintains the absolute original expiration timestamp of the initial refresh token regardless of subsequent exchanges.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                    <span id="badge-disableSlidingRefresh" class="flow-dep-badge">Requires Refresh Token Flow</span>
+                                </strong>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Maintains the absolute original expiration timestamp of the initial refresh token regardless of subsequent exchanges.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Disable Scope Validation -->
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="disableScopeValidation" id="policy-disableScopeValidation" value="true" checked="@Model.DisableScopeValidation" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Disable Scope Validation
+                                    <span class="info-icon" title="Disables strict validation against registered scopes, accepting arbitrary requested scopes.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Disables strict validation against registered scopes, accepting arbitrary requested scopes.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Accept Anonymous Clients -->
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="acceptAnonymousClients" id="policy-acceptAnonymousClients" value="true" checked="@Model.AcceptAnonymousClients" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Accept Anonymous Clients
+                                    <span class="info-icon" title="Allows token and authorization requests that do not specify a registered client_id.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Allows token and authorization requests that do not specify a registered <code>client_id</code>.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Disable Token Storage in Database -->
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="disableTokenStorage" id="policy-disableTokenStorage" value="true" checked="@Model.DisableTokenStorage" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Disable Database Token Storage
+                                    <span class="info-icon" title="Stops saving token entities in the database. Disables reference tokens and database revocation tracking.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Stops saving token entities in the database. Disables reference tokens and database revocation tracking.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Disable Authorization Storage in Database -->
+                    <div style="padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
+                            <input type="checkbox" name="disableAuthStorage" id="policy-disableAuthStorage" value="true" checked="@Model.DisableAuthorizationStorage" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                                    Disable Database Authorization Storage
+                                    <span class="info-icon" title="Stops persisting permanent user consent/authorization records in the database store. Users will be prompted for consent each time.">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    </span>
+                                </strong>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
+                                    Stops persisting permanent user consent/authorization records in the database store.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button Footer -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 0.5rem; flex-wrap: wrap; gap: 1rem;">
+                <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 0.25rem;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    Settings take effect immediately for the active application instance.
+                </p>
+                <button type="submit" class="btn btn-primary" style="padding: 0.6rem 2rem; font-weight: 600; font-size: 0.95rem;">
+                    Save OIDC Server Configuration
+                </button>
+            </div>
+        </form>
+    }
+</div>
+
+<!-- ============================================== -->
+<!-- TAB PANEL 3: TOKENS & BACKGROUND JOB           -->
 <!-- ============================================== -->
 <div id="tab-panel-tokens" class="tab-panel @isTokensActive">
 
@@ -98,7 +949,12 @@
                 </div>
                 <div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.35rem;">
-                        <h2 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary); margin: 0;">Expired &amp; Revoked Token Cleanup Job</h2>
+                        <h2 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary); margin: 0;">
+                            Expired &amp; Revoked Token Cleanup Job
+                            <span class="info-icon" title="Background worker that periodically queries the database and deletes expired and revoked tokens to prevent unbounded table growth.">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            </span>
+                        </h2>
                         @if (Model.CleanupJobEnabled)
                         {
                             <span class="badge" style="background: rgba(52, 211, 153, 0.15); color: #34d399; font-weight: 500; font-size: 0.8rem; padding: 0.2rem 0.65rem; display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 9999px;">
@@ -209,6 +1065,9 @@
                 <div class="form-group" style="margin-bottom: 0;">
                     <label class="form-label" for="settings-batch-size">
                         Prune Amount (Batch Limit)
+                        <span class="info-icon" title="Maximum number of expired or revoked tokens to delete in a single batch operation. Default is 1,000.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
                         <span style="color: var(--accent-primary, #818cf8); font-size: 0.8rem; font-weight: normal; margin-left: 0.35rem;">Tokens to clear per execution cycle</span>
                     </label>
                     <input type="number" name="batchSize" id="settings-batch-size" class="form-control" value="@Model.CleanupJobBatchSize" min="1" max="100000" required />
@@ -227,7 +1086,12 @@
 
                 <!-- Run Interval Field -->
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label class="form-label" for="settings-interval-select">Run Frequency (Interval)</label>
+                    <label class="form-label" for="settings-interval-select">
+                        Run Frequency (Interval)
+                        <span class="info-icon" title="Frequency interval determining how often the background service triggers a pruning cycle.">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </span>
+                    </label>
                     <select name="intervalMinutes" id="settings-interval-select" class="form-select">
                         <option value="15" selected="@(Model.CleanupJobIntervalMinutes == 15)">Every 15 minutes</option>
                         <option value="30" selected="@(Model.CleanupJobIntervalMinutes == 30)">Every 30 minutes</option>
@@ -246,7 +1110,12 @@
                 <label style="display: flex; align-items: flex-start; gap: 0.65rem; cursor: pointer;">
                     <input type="checkbox" name="includeRevoked" value="true" checked="@Model.CleanupJobIncludeRevoked" style="accent-color: var(--accent-primary, #818cf8); width: 18px; height: 18px; margin-top: 2px;" />
                     <div>
-                        <strong style="color: var(--text-primary); font-size: 0.9rem;">Include Revoked Tokens in Cleanup</strong>
+                        <strong style="color: var(--text-primary); font-size: 0.9rem;">
+                            Include Revoked Tokens in Cleanup
+                            <span class="info-icon" title="When checked, the job cleans both expired tokens and explicitly revoked tokens. When unchecked, only expired tokens are cleared.">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            </span>
+                        </strong>
                         <p style="margin: 0.15rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
                             When checked, the job cleans both expired tokens and explicitly revoked tokens. When unchecked, only expired tokens are cleared.
                         </p>
@@ -278,6 +1147,147 @@
             const url = new URL(window.location);
             url.searchParams.set('activeTab', tabName);
             window.history.replaceState({}, '', url);
+        }
+
+        function selectAllStandardScopes() {
+            document.querySelectorAll('.standard-scope-checkbox').forEach(cb => cb.checked = true);
+            updateActiveScopePills();
+        }
+
+        function clearAllRegisteredScopes() {
+            document.querySelectorAll('.registered-scope-checkbox').forEach(cb => cb.checked = false);
+            const customText = document.getElementById('customScopesText');
+            if (customText) customText.value = '';
+            updateActiveScopePills();
+        }
+
+        function updateActiveScopePills() {
+            const pillsContainer = document.getElementById('active-scopes-pills');
+            if (!pillsContainer) return;
+
+            const checked = [];
+            document.querySelectorAll('.registered-scope-checkbox:checked').forEach(cb => {
+                checked.push(cb.value);
+            });
+
+            const customText = document.getElementById('customScopesText');
+            if (customText && customText.value.trim()) {
+                const customs = customText.value.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
+                customs.forEach(c => {
+                    if (!checked.includes(c)) checked.push(c);
+                });
+            }
+
+            if (checked.length === 0) {
+                pillsContainer.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">No scopes currently registered.</span>';
+                return;
+            }
+
+            pillsContainer.innerHTML = checked.map(s => 
+                `<span class="badge" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--accent-primary, #818cf8); font-size: 0.8rem; padding: 0.25rem 0.65rem; border-radius: 9999px;">${escapeHtml(s)}</span>`
+            ).join(' ');
+        }
+
+        function updateFlowDependencies() {
+            const authCodeCb = document.getElementById('flow-authCode');
+            const clientCredsCb = document.getElementById('flow-clientCreds');
+            const refreshTokenCb = document.getElementById('flow-refreshToken');
+            const passwordCb = document.getElementById('flow-password');
+            const implicitCb = document.getElementById('flow-implicit');
+            const deviceCodeCb = document.getElementById('flow-deviceCode');
+
+            const authCodeChecked = authCodeCb ? authCodeCb.checked : false;
+            const clientCredsChecked = clientCredsCb ? clientCredsCb.checked : false;
+            const refreshTokenChecked = refreshTokenCb ? refreshTokenCb.checked : false;
+            const passwordChecked = passwordCb ? passwordCb.checked : false;
+            const implicitChecked = implicitCb ? implicitCb.checked : false;
+            const deviceCodeChecked = deviceCodeCb ? deviceCodeCb.checked : false;
+
+            const anyTokenFlowChecked = authCodeChecked || clientCredsChecked || refreshTokenChecked || passwordChecked || implicitChecked || deviceCodeChecked;
+            const idTokenFlowChecked = authCodeChecked || implicitChecked;
+
+            function setFieldState(containerId, inputId, badgeId, isEnabled) {
+                const container = document.getElementById(containerId);
+                const input = document.getElementById(inputId);
+                const badge = document.getElementById(badgeId);
+
+                if (input) {
+                    input.disabled = !isEnabled;
+                }
+
+                if (container) {
+                    if (isEnabled) {
+                        container.classList.remove('is-disabled');
+                        container.querySelectorAll('button').forEach(b => b.disabled = false);
+                    } else {
+                        container.classList.add('is-disabled');
+                        container.querySelectorAll('button').forEach(b => b.disabled = true);
+                    }
+                }
+
+                if (badge) {
+                    badge.style.display = isEnabled ? 'none' : 'inline-block';
+                }
+            }
+
+            // 1. Access Token Lifetime -> Depends on any token-issuing flow being active
+            setFieldState('group-accessTokenMinutes', 'accessTokenMinutes', 'badge-accessTokenMinutes', anyTokenFlowChecked);
+
+            // 2. Refresh Token Lifetime -> Depends on Refresh Token Flow
+            setFieldState('group-refreshTokenDays', 'refreshTokenDays', 'badge-refreshTokenDays', refreshTokenChecked);
+
+            // 3. Auth Code Lifetime -> Depends on Authorization Code Flow
+            setFieldState('group-authCodeMinutes', 'authCodeMinutes', 'badge-authCodeMinutes', authCodeChecked);
+
+            // 4. Identity Token Lifetime -> Depends on Auth Code or Implicit Flow
+            setFieldState('group-identityTokenMinutes', 'identityTokenMinutes', 'badge-identityTokenMinutes', idTokenFlowChecked);
+
+            // 5. Device Code Lifetime -> Depends on Device Authorization Flow
+            setFieldState('group-deviceCodeMinutes', 'deviceCodeMinutes', 'badge-deviceCodeMinutes', deviceCodeChecked);
+
+            // 6. Refresh Token Reuse Leeway -> Depends on Refresh Token Flow
+            setFieldState('group-reuseLeewaySeconds', 'reuseLeewaySeconds', 'badge-reuseLeewaySeconds', refreshTokenChecked);
+
+            // 7. PKCE Enforcement Policy -> Depends on Authorization Code Flow
+            setFieldState('group-requirePkce', 'policy-requirePkce', 'badge-requirePkce', authCodeChecked);
+
+            // 8. Reference Refresh Tokens -> Depends on Refresh Token Flow
+            setFieldState('group-useRefRefreshTokens', 'policy-useRefRefreshTokens', 'badge-useRefRefreshTokens', refreshTokenChecked);
+
+            // 9. Disable Rolling Refresh Tokens -> Depends on Refresh Token Flow
+            setFieldState('group-disableRollingRefresh', 'policy-disableRollingRefresh', 'badge-disableRollingRefresh', refreshTokenChecked);
+
+            // 10. Disable Sliding Refresh Expiration -> Depends on Refresh Token Flow
+            setFieldState('group-disableSlidingRefresh', 'policy-disableSlidingRefresh', 'badge-disableSlidingRefresh', refreshTokenChecked);
+        }
+
+        // Handle form submission to ensure all lifetime values are preserved even if currently disabled in UI
+        const oidcForm = document.getElementById('oidc-config-form');
+        if (oidcForm) {
+            oidcForm.addEventListener('submit', function() {
+                oidcForm.querySelectorAll('input:disabled, select:disabled').forEach(function(el) {
+                    el.disabled = false;
+                });
+            });
+        }
+
+        // Attach event listeners for real-time reactivity
+        ['flow-authCode', 'flow-clientCreds', 'flow-refreshToken', 'flow-password', 'flow-implicit', 'flow-deviceCode'].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('change', updateFlowDependencies);
+            }
+        });
+
+        // Initialize state on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', updateFlowDependencies);
+        } else {
+            updateFlowDependencies();
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
     </script>
 }
