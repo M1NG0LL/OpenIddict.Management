@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
+    <PackageId>Mingoll.OpenIddict.Management.Dashboard</PackageId>
     <Description>Embedded Razor Class Library admin dashboard UI for managing OpenIddict applications, scopes, authorizations, and tokens.</Description>
     <PackageTags>openiddict;identity;dashboard;admin;ui;razor-pages;aspnetcore;management</PackageTags>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>

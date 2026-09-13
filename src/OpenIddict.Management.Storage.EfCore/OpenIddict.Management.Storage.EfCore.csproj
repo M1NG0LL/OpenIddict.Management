@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <PackageId>Mingoll.OpenIddict.Management.Storage.EfCore</PackageId>
     <Description>Entity Framework Core stores, entities, and migration helpers for OpenIddict.Management.</Description>
     <PackageTags>openiddict;identity;efcore;entityframework;database;storage;management</PackageTags>
   </PropertyGroup>

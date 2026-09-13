@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <PackageId>Mingoll.OpenIddict.Management.Core</PackageId>
     <Description>Core abstractions, domain models, options, token principal services, and management interfaces for OpenIddict.</Description>
     <PackageTags>openiddict;identity;oauth2;oidc;security;abstractions;management</PackageTags>
   </PropertyGroup>
