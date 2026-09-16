@@ -10,12 +10,12 @@ using Xunit;
 
 namespace OpenIddict.Management.Storage.EfCore.Tests;
 
-public class RevocationStoreTests : IDisposable
+public class TokenStoreTests : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<TestDbContext> _options;
 
-    public RevocationStoreTests()
+    public TokenStoreTests()
     {
         _connection = new SqliteConnection("DataSource=:memory:");
         _connection.Open();
@@ -46,8 +46,8 @@ public class RevocationStoreTests : IDisposable
         // Act
         await using (var context = new TestDbContext(_options))
         {
-            var revocationManager = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
-            var result = await revocationManager.RevokeByUserAsync(userId);
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var result = await store.RevokeByUserAsync(userId);
 
             // Assert
             result.IsSuccess.Should().BeTrue();
@@ -88,7 +88,7 @@ public class RevocationStoreTests : IDisposable
                     Application = app,
                     Status = "valid",
                     Type = "access_token",
-                    CreatedAt = DateTimeOffset.UtcNow.AddHours(-1)
+                    CreationDate = DateTime.UtcNow.AddHours(-1)
                 },
                 new ManagementToken
                 {
@@ -97,7 +97,7 @@ public class RevocationStoreTests : IDisposable
                     Application = app,
                     Status = "valid",
                     Type = "refresh_token",
-                    CreatedAt = DateTimeOffset.UtcNow.AddHours(-2)
+                    CreationDate = DateTime.UtcNow.AddHours(-2)
                 },
                 new ManagementToken
                 {
@@ -105,7 +105,7 @@ public class RevocationStoreTests : IDisposable
                     Subject = userId,
                     Status = "revoked",
                     Type = "access_token",
-                    CreatedAt = DateTimeOffset.UtcNow.AddDays(-5)
+                    CreationDate = DateTime.UtcNow.AddDays(-5)
                 }
             );
             await context.SaveChangesAsync();
@@ -114,10 +114,10 @@ public class RevocationStoreTests : IDisposable
         // Act
         await using (var context = new TestDbContext(_options))
         {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
 
             // Filter by ClientId and UserId
-            var result = await store.ListTokensAsync(new OpenIddict.Management.Dto.TokenFilterRequest
+            var result = await store.ListTokensAsync(new TokenFilterRequest
             {
                 ClientId = clientId,
                 UserId = userId,
@@ -147,9 +147,9 @@ public class RevocationStoreTests : IDisposable
             context.Applications.AddRange(app, otherApp);
 
             context.Tokens.AddRange(
-                new ManagementToken { Id = Guid.NewGuid(), Application = app, Status = "valid", CreatedAt = DateTimeOffset.UtcNow },
-                new ManagementToken { Id = Guid.NewGuid(), Application = app, Status = "valid", CreatedAt = DateTimeOffset.UtcNow },
-                new ManagementToken { Id = Guid.NewGuid(), Application = otherApp, Status = "valid", CreatedAt = DateTimeOffset.UtcNow }
+                new ManagementToken { Id = Guid.NewGuid(), Application = app, Status = "valid", CreationDate = DateTime.UtcNow },
+                new ManagementToken { Id = Guid.NewGuid(), Application = app, Status = "valid", CreationDate = DateTime.UtcNow },
+                new ManagementToken { Id = Guid.NewGuid(), Application = otherApp, Status = "valid", CreationDate = DateTime.UtcNow }
             );
             await context.SaveChangesAsync();
         }
@@ -157,8 +157,8 @@ public class RevocationStoreTests : IDisposable
         // Act
         await using (var context = new TestDbContext(_options))
         {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
-            var result = await store.RevokeTokensWithFilterAsync(new OpenIddict.Management.Dto.TokenFilterRequest
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var result = await store.RevokeTokensWithFilterAsync(new TokenFilterRequest
             {
                 ClientId = targetClient
             });
@@ -182,8 +182,6 @@ public class RevocationStoreTests : IDisposable
     [Fact]
     public async Task ListTokensAsync_TokenExpirationDate_IsNormalizedToUtcAndNotPrematurelyExpired()
     {
-        // Arrange: simulate database containing a token expiring in 1 hour in UTC
-        // When stored in EF Core without timezone (Kind = Unspecified), it must be interpreted as UTC (+00:00)
         var futureUtc = DateTime.UtcNow.AddHours(1);
         var unspecifiedFutureDate = DateTime.SpecifyKind(futureUtc, DateTimeKind.Unspecified);
 
@@ -230,7 +228,7 @@ public class RevocationStoreTests : IDisposable
         // Act
         await using (var context = new TestDbContext(_options))
         {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
             var result = await store.ListTokensAsync(new TokenFilterRequest
             {
                 ClientId = "expiry-test-client"
@@ -258,7 +256,6 @@ public class RevocationStoreTests : IDisposable
     [Fact]
     public async Task ListTokensAsync_WithAuthorizationId_FiltersCorrectly()
     {
-        // Arrange
         var auth1Id = Guid.NewGuid();
         var auth2Id = Guid.NewGuid();
         var token1Id = Guid.NewGuid();
@@ -316,7 +313,7 @@ public class RevocationStoreTests : IDisposable
         // Act
         await using (var context = new TestDbContext(_options))
         {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
             var result = await store.ListTokensAsync(new TokenFilterRequest
             {
                 AuthorizationId = auth1Id.ToString()
@@ -332,7 +329,6 @@ public class RevocationStoreTests : IDisposable
     [Fact]
     public async Task GetTokenCountsAsync_ReturnsAccurateCounts()
     {
-        // Arrange
         var now = DateTimeOffset.UtcNow;
         var validTokenFutureId = Guid.NewGuid();
         var validTokenNullExpiryId = Guid.NewGuid();
@@ -394,7 +390,7 @@ public class RevocationStoreTests : IDisposable
         // Act & Assert
         await using (var context = new TestDbContext(_options))
         {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
             var result = await store.GetTokenCountsAsync();
 
             result.IsSuccess.Should().BeTrue();
@@ -406,56 +402,8 @@ public class RevocationStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task GetActiveAuthorizationsCountAsync_ReturnsActiveCount()
-    {
-        // Arrange
-        var now = DateTimeOffset.UtcNow;
-        await using (var context = new TestDbContext(_options))
-        {
-            var app = new ManagementApplication
-            {
-                Id = Guid.NewGuid(),
-                ClientId = "auth-counts-test-client",
-                CreatedAt = now
-            };
-            context.Applications.Add(app);
-
-            context.Authorizations.AddRange(
-                new ManagementAuthorization
-                {
-                    Id = Guid.NewGuid(),
-                    Application = app,
-                    Subject = "user-1",
-                    Status = "valid",
-                    CreatedAt = now
-                },
-                new ManagementAuthorization
-                {
-                    Id = Guid.NewGuid(),
-                    Application = app,
-                    Subject = "user-2",
-                    Status = "revoked",
-                    CreatedAt = now
-                }
-            );
-            await context.SaveChangesAsync();
-        }
-
-        // Act & Assert
-        await using (var context = new TestDbContext(_options))
-        {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
-            var result = await store.GetActiveAuthorizationsCountAsync();
-
-            result.IsSuccess.Should().BeTrue();
-            result.Value.Should().Be(1);
-        }
-    }
-
-    [Fact]
     public async Task GetTokenCountsByApplicationAsync_ReturnsAppTokenCounts()
     {
-        // Arrange
         var now = DateTimeOffset.UtcNow;
         await using (var context = new TestDbContext(_options))
         {
@@ -476,9 +424,9 @@ public class RevocationStoreTests : IDisposable
             context.Applications.AddRange(app1, app2);
 
             context.Tokens.AddRange(
-                new ManagementToken { Id = Guid.NewGuid(), Application = app1, CreationDate = now.UtcDateTime, Status = "valid", CreatedAt = now },
-                new ManagementToken { Id = Guid.NewGuid(), Application = app1, CreationDate = now.UtcDateTime, Status = "valid", CreatedAt = now },
-                new ManagementToken { Id = Guid.NewGuid(), Application = app2, CreationDate = now.UtcDateTime, Status = "valid", CreatedAt = now }
+                new ManagementToken { Id = Guid.NewGuid(), Application = app1, CreationDate = now.UtcDateTime, Status = "valid" },
+                new ManagementToken { Id = Guid.NewGuid(), Application = app1, CreationDate = now.UtcDateTime, Status = "valid" },
+                new ManagementToken { Id = Guid.NewGuid(), Application = app2, CreationDate = now.UtcDateTime, Status = "valid" }
             );
             await context.SaveChangesAsync();
         }
@@ -486,7 +434,7 @@ public class RevocationStoreTests : IDisposable
         // Act & Assert
         await using (var context = new TestDbContext(_options))
         {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
             var result = await store.GetTokenCountsByApplicationAsync();
 
             result.IsSuccess.Should().BeTrue();
@@ -501,7 +449,6 @@ public class RevocationStoreTests : IDisposable
     [Fact]
     public async Task GetTokenTimelineAsync_ReturnsDailyCountsAndFiltersByClient()
     {
-        // Arrange
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var yesterday = today.AddDays(-1);
         var now = DateTime.UtcNow;
@@ -526,7 +473,7 @@ public class RevocationStoreTests : IDisposable
         // Act & Assert
         await using (var context = new TestDbContext(_options))
         {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
             var result = await store.GetTokenTimelineAsync(yesterday, today, "timeline-app");
 
             result.IsSuccess.Should().BeTrue();
@@ -537,84 +484,8 @@ public class RevocationStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task ListSessionsAsync_ReturnsPaginatedAndFilteredSessions()
-    {
-        // Arrange
-        var now = DateTime.UtcNow;
-        var nowOffset = DateTimeOffset.UtcNow;
-
-        await using (var context = new TestDbContext(_options))
-        {
-            var app = new ManagementApplication
-            {
-                Id = Guid.NewGuid(),
-                ClientId = "session-test-client",
-                DisplayName = "Session App",
-                CreatedAt = nowOffset
-            };
-            context.Applications.Add(app);
-
-            var auth1 = new ManagementAuthorization
-            {
-                Id = Guid.NewGuid(),
-                Application = app,
-                Subject = "alice",
-                Status = "valid",
-                Scopes = "openid profile",
-                CreationDate = now,
-                CreatedAt = nowOffset
-            };
-            var auth2 = new ManagementAuthorization
-            {
-                Id = Guid.NewGuid(),
-                Application = app,
-                Subject = "bob",
-                Status = "revoked",
-                Scopes = "openid",
-                CreationDate = now.AddMinutes(-5),
-                CreatedAt = nowOffset.AddMinutes(-5)
-            };
-            context.Authorizations.AddRange(auth1, auth2);
-
-            context.Tokens.Add(new ManagementToken
-            {
-                Id = Guid.NewGuid(),
-                Authorization = auth1,
-                Application = app,
-                CreationDate = now,
-                Status = "valid"
-            });
-
-            await context.SaveChangesAsync();
-        }
-
-        // Act & Assert
-        await using (var context = new TestDbContext(_options))
-        {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
-
-            // Filter active only
-            var result = await store.ListSessionsAsync(new SessionFilterRequest
-            {
-                Status = "active",
-                PageIndex = 1,
-                PageSize = 10
-            });
-
-            result.IsSuccess.Should().BeTrue();
-            result.Value.Should().NotBeNull();
-            result.Value!.TotalCount.Should().Be(1);
-            result.Value.Items.Should().HaveCount(1);
-            result.Value.Items[0].Subject.Should().Be("alice");
-            result.Value.Items[0].TokenCount.Should().Be(1);
-            result.Value.Items[0].IsRevoked.Should().BeFalse();
-        }
-    }
-
-    [Fact]
     public async Task PruneTokensAsync_RemovesExpiredAndRevokedTokens()
     {
-        // Arrange
         var expiredTokenId = Guid.NewGuid();
         var revokedTokenId = Guid.NewGuid();
         var validTokenId = Guid.NewGuid();
@@ -662,7 +533,7 @@ public class RevocationStoreTests : IDisposable
         // Act
         await using (var context = new TestDbContext(_options))
         {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
             var result = await store.PruneTokensAsync(batchSize: null, includeRevoked: true);
 
             // Assert
@@ -678,7 +549,6 @@ public class RevocationStoreTests : IDisposable
     [Fact]
     public async Task PruneTokensAsync_WithBatchSize_LimitsPrunedTokens()
     {
-        // Arrange
         await using (var context = new TestDbContext(_options))
         {
             var app = new ManagementApplication
@@ -706,7 +576,7 @@ public class RevocationStoreTests : IDisposable
         // Act - prune with batchSize = 2
         await using (var context = new TestDbContext(_options))
         {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
             var result = await store.PruneTokensAsync(batchSize: 2, includeRevoked: true);
 
             // Assert
@@ -721,7 +591,6 @@ public class RevocationStoreTests : IDisposable
     [Fact]
     public async Task PruneTokensAsync_WithoutIncludeRevoked_RemovesOnlyExpiredTokens()
     {
-        // Arrange
         var expiredTokenId = Guid.NewGuid();
         var revokedTokenId = Guid.NewGuid();
 
@@ -760,7 +629,7 @@ public class RevocationStoreTests : IDisposable
         // Act - includeRevoked = false
         await using (var context = new TestDbContext(_options))
         {
-            var store = new EfCoreRevocationStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
             var result = await store.PruneTokensAsync(batchSize: null, includeRevoked: false);
 
             // Assert
@@ -770,6 +639,114 @@ public class RevocationStoreTests : IDisposable
             var remaining = await context.Tokens.ToListAsync();
             remaining.Should().HaveCount(1);
             remaining[0].Id.Should().Be(revokedTokenId);
+        }
+    }
+
+    [Fact]
+    public async Task ExtendTokenExpirationAsync_ValidAndExpiredTokens_ExtendsBoth()
+    {
+        var now = DateTime.UtcNow;
+        var validTokenId = Guid.NewGuid();
+        var expiredTokenId = Guid.NewGuid();
+        var revokedTokenId = Guid.NewGuid();
+
+        await using (var context = new TestDbContext(_options))
+        {
+            context.Tokens.AddRange(
+                new ManagementToken
+                {
+                    Id = validTokenId,
+                    Status = "valid",
+                    CreationDate = now.AddHours(-1),
+                    ExpirationDate = now.AddMinutes(10)
+                },
+                new ManagementToken
+                {
+                    Id = expiredTokenId,
+                    Status = "expired",
+                    CreationDate = now.AddDays(-2),
+                    ExpirationDate = now.AddDays(-1)
+                },
+                new ManagementToken
+                {
+                    Id = revokedTokenId,
+                    Status = "revoked",
+                    RevokedAt = now.AddDays(-1),
+                    CreationDate = now.AddDays(-3),
+                    ExpirationDate = now.AddDays(1)
+                }
+            );
+            await context.SaveChangesAsync();
+        }
+
+        // Act
+        await using (var context = new TestDbContext(_options))
+        {
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var result = await store.ExtendTokenExpirationAsync(
+                new[] { validTokenId.ToString(), expiredTokenId.ToString(), revokedTokenId.ToString() },
+                additionalMinutes: 60);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            result.Value.Should().Be(2);
+        }
+
+        // Verify in database
+        await using (var context = new TestDbContext(_options))
+        {
+            var validToken = await context.Tokens.FindAsync(validTokenId);
+            validToken.Should().NotBeNull();
+            validToken!.ExpirationDate.Should().BeAfter(now.AddMinutes(65));
+
+            var expiredToken = await context.Tokens.FindAsync(expiredTokenId);
+            expiredToken.Should().NotBeNull();
+            expiredToken!.Status.Should().Be("valid");
+            expiredToken.ExpirationDate.Should().BeAfter(now.AddMinutes(55));
+
+            var revokedToken = await context.Tokens.FindAsync(revokedTokenId);
+            revokedToken.Should().NotBeNull();
+            revokedToken!.Status.Should().Be("revoked");
+        }
+    }
+
+    [Fact]
+    public async Task RevokeMultipleTokensAsync_MultipleValidTokens_RevokesAll()
+    {
+        var token1 = Guid.NewGuid();
+        var token2 = Guid.NewGuid();
+        var token3 = Guid.NewGuid();
+
+        await using (var context = new TestDbContext(_options))
+        {
+            context.Tokens.AddRange(
+                new ManagementToken { Id = token1, Status = "valid", CreationDate = DateTime.UtcNow },
+                new ManagementToken { Id = token2, Status = "valid", CreationDate = DateTime.UtcNow },
+                new ManagementToken { Id = token3, Status = "revoked", RevokedAt = DateTime.UtcNow, CreationDate = DateTime.UtcNow }
+            );
+            await context.SaveChangesAsync();
+        }
+
+        // Act
+        await using (var context = new TestDbContext(_options))
+        {
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var result = await store.RevokeMultipleTokensAsync(new[] { token1.ToString(), token2.ToString(), token3.ToString() });
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            result.Value.TokensRevoked.Should().Be(2);
+        }
+
+        // Verify DB
+        await using (var context = new TestDbContext(_options))
+        {
+            var t1 = await context.Tokens.FindAsync(token1);
+            var t2 = await context.Tokens.FindAsync(token2);
+            t1!.Status.Should().Be("revoked");
+            t1.RevokedAt.Should().NotBeNull();
+            t2!.Status.Should().Be("revoked");
+            t2.RevokedAt.Should().NotBeNull();
         }
     }
 

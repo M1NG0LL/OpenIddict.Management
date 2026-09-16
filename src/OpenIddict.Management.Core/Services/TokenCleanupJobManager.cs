@@ -215,20 +215,20 @@ public class TokenCleanupJobManager : ITokenCleanupJobManager
         try
         {
             using var scope = serviceProvider.GetRequiredService<IServiceScopeFactory>().CreateScope();
-            var revocationManager = scope.ServiceProvider.GetService<IOpenIddictRevocationManager>();
+            var tokenManager = scope.ServiceProvider.GetService<IOpenIddictTokenManager>();
 
-            if (revocationManager is null)
+            if (tokenManager is null)
             {
                 lock (_syncLock)
                 {
                     _lastStatus = "NoStore";
-                    _lastError = "IOpenIddictRevocationManager is not registered in the service provider.";
+                    _lastError = "IOpenIddictTokenManager is not registered in the service provider.";
                 }
-                _logger?.LogWarning("Token cleanup skipped: IOpenIddictRevocationManager not registered.");
+                _logger?.LogWarning("Token cleanup skipped: IOpenIddictTokenManager not registered.");
                 return 0;
             }
 
-            var result = await revocationManager.PruneTokensAsync(
+            var result = await tokenManager.PruneTokensAsync(
                 batchSize: currentBatchSize,
                 includeRevoked: currentIncludeRevoked,
                 cancellationToken: cancellationToken);

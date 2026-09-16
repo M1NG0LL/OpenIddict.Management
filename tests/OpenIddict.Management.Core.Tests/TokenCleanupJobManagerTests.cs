@@ -114,7 +114,7 @@ public class TokenCleanupJobManagerTests
     [Fact]
     public async Task RunJobCycleAsync_CallsRevocationManagerAndUpdatesStats()
     {
-        var revocationManager = Substitute.For<IOpenIddictRevocationManager>();
+        var revocationManager = Substitute.For<IOpenIddictTokenManager>();
         revocationManager.PruneTokensAsync(100, true, Arg.Any<CancellationToken>())
             .Returns(Result.Success(42));
 
@@ -141,7 +141,7 @@ public class TokenCleanupJobManagerTests
     [Fact]
     public async Task RunJobCycleAsync_WhenPruningFails_UpdatesStatusAndError()
     {
-        var revocationManager = Substitute.For<IOpenIddictRevocationManager>();
+        var revocationManager = Substitute.For<IOpenIddictTokenManager>();
         revocationManager.PruneTokensAsync(100, true, Arg.Any<CancellationToken>())
             .Returns(Result.Failure<int>("PruneError", "Database timeout occurred."));
 
@@ -162,7 +162,7 @@ public class TokenCleanupJobManagerTests
     [Fact]
     public async Task TriggerRunAsync_ExecutesSynchronously()
     {
-        var revocationManager = Substitute.For<IOpenIddictRevocationManager>();
+        var revocationManager = Substitute.For<IOpenIddictTokenManager>();
         revocationManager.PruneTokensAsync(100, true, Arg.Any<CancellationToken>())
             .Returns(Result.Success(15));
 

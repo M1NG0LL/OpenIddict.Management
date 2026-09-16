@@ -19,7 +19,8 @@ internal static class OverviewEndpointsGroup
         overviewGroup.MapGet("/", async (
             [FromServices] IApplicationManagementService appService,
             [FromServices] IScopeManagementService scopeService,
-            [FromServices] IOpenIddictRevocationManager revocationManager,
+            [FromServices] IOpenIddictTokenManager tokenManager,
+            [FromServices] IOpenIddictAuthorizationManager authorizationManager,
             CancellationToken cancellationToken) =>
         {
             var totalApps = 0;
@@ -40,7 +41,7 @@ internal static class OverviewEndpointsGroup
 
             var totalTokens = 0;
             var revokedTokens = 0;
-            var tokenCountsResult = await revocationManager.GetTokenCountsAsync(cancellationToken);
+            var tokenCountsResult = await tokenManager.GetTokenCountsAsync(cancellationToken);
             if (tokenCountsResult.IsSuccess && tokenCountsResult.Value is not null)
             {
                 totalTokens = tokenCountsResult.Value.Total;
@@ -48,7 +49,7 @@ internal static class OverviewEndpointsGroup
             }
 
             var activeAuthorizations = 0;
-            var authResult = await revocationManager.GetActiveAuthorizationsCountAsync(cancellationToken);
+            var authResult = await authorizationManager.GetActiveAuthorizationsCountAsync(cancellationToken);
             if (authResult.IsSuccess)
             {
                 activeAuthorizations = authResult.Value;

@@ -10,11 +10,6 @@ public class ManagementToken<TKey> : OpenIddictEntityFrameworkCoreToken<TKey, Ma
     where TKey : IEquatable<TKey>
 {
     /// <summary>
-    /// Gets or sets the UTC timestamp when the token was created.
-    /// </summary>
-    public DateTimeOffset CreatedAt { get; set; }
-
-    /// <summary>
     /// Gets or sets the UTC timestamp when the token was revoked, if applicable.
     /// </summary>
     public DateTimeOffset? RevokedAt { get; set; }

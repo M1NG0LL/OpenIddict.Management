@@ -274,7 +274,6 @@ public class DashboardPageRenderTests : IDisposable
                 Application = clientApp,
                 Status = "valid",
                 Type = "access_token",
-                CreatedAt = DateTimeOffset.UtcNow,
                 Payload = "ey-sample-serialized-data-12345"
             });
             await db.SaveChangesAsync();
@@ -291,7 +290,8 @@ public class DashboardPageRenderTests : IDisposable
 
         var content = await response.Content.ReadAsStringAsync();
         content.Should().Contain("Token Inspector & Revocation");
-        content.Should().Contain("Revoke Filtered Tokens");
+        content.Should().Contain("Select Tokens");
+        content.Should().Contain("Revoke Selected");
         content.Should().Contain("All Tokens");
         content.Should().Contain("Valid Tokens");
         content.Should().Contain("Expired Tokens");

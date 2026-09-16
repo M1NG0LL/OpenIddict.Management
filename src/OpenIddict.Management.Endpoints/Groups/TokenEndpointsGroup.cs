@@ -27,7 +27,7 @@ internal static class TokenEndpointsGroup
             [FromQuery(Name = "tokenType")] string? tokenType = null,
             [FromQuery(Name = "createdFrom")] DateTimeOffset? createdFrom = null,
             [FromQuery(Name = "createdTo")] DateTimeOffset? createdTo = null,
-            [FromServices] IOpenIddictRevocationManager manager = null!,
+            [FromServices] IOpenIddictTokenManager manager = null!,
             CancellationToken cancellationToken = default) =>
         {
             var filter = new TokenFilterRequest
@@ -53,7 +53,7 @@ internal static class TokenEndpointsGroup
         .Produces<PagedResult<TokenListDto>>(StatusCodes.Status200OK);
 
         tokenGroup.MapGet("/counts", async (
-            [FromServices] IOpenIddictRevocationManager manager,
+            [FromServices] IOpenIddictTokenManager manager,
             CancellationToken cancellationToken) =>
         {
             var result = await manager.GetTokenCountsAsync(cancellationToken);
@@ -66,7 +66,7 @@ internal static class TokenEndpointsGroup
 
         tokenGroup.MapPost("/revoke-filtered", async (
             [FromBody] TokenFilterRequest filter,
-            [FromServices] IOpenIddictRevocationManager manager,
+            [FromServices] IOpenIddictTokenManager manager,
             CancellationToken cancellationToken) =>
         {
             var result = await manager.RevokeTokensWithFilterAsync(filter, cancellationToken);
@@ -82,7 +82,7 @@ internal static class TokenEndpointsGroup
             [FromQuery(Name = "from")] DateOnly? from,
             [FromQuery(Name = "to")] DateOnly? to,
             [FromQuery(Name = "clientId")] string? clientId,
-            [FromServices] IOpenIddictRevocationManager manager,
+            [FromServices] IOpenIddictTokenManager manager,
             CancellationToken cancellationToken) =>
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -99,7 +99,7 @@ internal static class TokenEndpointsGroup
 
         tokenGroup.MapGet("/by-application", async Task<IResult> (
             [FromQuery(Name = "clientId")] string? clientId,
-            [FromServices] IOpenIddictRevocationManager manager,
+            [FromServices] IOpenIddictTokenManager manager,
             CancellationToken cancellationToken) =>
         {
             var result = await manager.GetTokenCountsByApplicationAsync(cancellationToken);
@@ -117,7 +117,7 @@ internal static class TokenEndpointsGroup
 
         tokenGroup.MapDelete("/{id}", async (
             string id,
-            [FromServices] IOpenIddictRevocationManager manager,
+            [FromServices] IOpenIddictTokenManager manager,
             CancellationToken cancellationToken) =>
         {
             var result = await manager.RevokeByTokenIdAsync(id, cancellationToken);
@@ -126,6 +126,32 @@ internal static class TokenEndpointsGroup
         .WithName("RevokeTokenById")
         .WithSummary("Revoke token by identifier")
         .WithDescription("Revokes a specific token by its unique token database identifier.")
+        .Produces<RevocationResultDto>(StatusCodes.Status200OK);
+        tokenGroup.MapPost("/extend", async (
+            [FromBody] ExtendTokenExpirationRequest request,
+            [FromServices] IOpenIddictTokenManager manager,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await manager.ExtendTokenExpirationAsync(request.TokenIds, request.AdditionalMinutes, cancellationToken);
+            return result.ToHttpResult();
+        })
+        .WithName("ExtendTokenExpiration")
+        .WithSummary("Extend expiration of tokens")
+        .WithDescription("Extends the expiration time of specified tokens (valid or expired) by a given number of minutes.")
+        .Produces<int>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status400BadRequest);
+
+        tokenGroup.MapPost("/revoke-multiple", async (
+            [FromBody] RevokeMultipleTokensRequest request,
+            [FromServices] IOpenIddictTokenManager manager,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await manager.RevokeMultipleTokensAsync(request.TokenIds, cancellationToken);
+            return result.ToHttpResult();
+        })
+        .WithName("RevokeMultipleTokens")
+        .WithSummary("Revoke multiple tokens by identifiers")
+        .WithDescription("Revokes multiple active tokens in a single batch operation.")
         .Produces<RevocationResultDto>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status400BadRequest);
 

@@ -22,7 +22,7 @@ internal static class SessionEndpointsGroup
             [FromQuery(Name = "userId")] string? userId = null,
             [FromQuery(Name = "clientId")] string? clientId = null,
             [FromQuery(Name = "status")] string? status = null,
-            [FromServices] IOpenIddictRevocationManager manager = null!,
+            [FromServices] IOpenIddictAuthorizationManager manager = null!,
             CancellationToken cancellationToken = default) =>
         {
             var filter = new SessionFilterRequest

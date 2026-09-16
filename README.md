@@ -36,7 +36,7 @@ OpenIddict is powerful but verbose. This library wraps the ceremony into clean A
 | Pain Point | OpenIddict (raw) | OpenIddict.Management |
 |---|---|---|
 | Application CRUD | Manual `IOpenIddictApplicationManager` calls | `IApplicationManagementService` with typed DTOs |
-| Token / session revocation | Multi-step token lookup + deletion | `IOpenIddictRevocationManager.RevokeByUserAsync(userId)` |
+| Token / session revocation | Multi-step token lookup + deletion | `IOpenIddictTokenManager.RevokeByUserAsync(userId)` |
 | Token principal construction | Manual `ClaimsIdentity` + destination wiring | `IOpenIddictTokenService.CreatePrincipal(loginResult)` |
 | Admin UI | Build from scratch | Embedded Razor Class Library dashboard |
 | Scope CRUD | Manual `IOpenIddictScopeManager` calls | `IScopeManagementService` with pagination & search |
@@ -120,7 +120,8 @@ builder.Services
 
 `AddOpenIddictManagementStores<TContext>()` additionally registers:
 - `IApplicationManagementService` → `EfCoreApplicationManagementStore`
-- `IOpenIddictRevocationManager` → `EfCoreRevocationStore`
+- `IOpenIddictTokenManager` → `EfCoreTokenStore`
+- `IOpenIddictAuthorizationManager` → `EfCoreAuthorizationStore`
 - `IScopeManagementService` → `EfCoreScopeManagementStore`
 - OpenIddict Core with EF Core, using the extended management entities
 

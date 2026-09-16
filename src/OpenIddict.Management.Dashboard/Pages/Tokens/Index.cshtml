@@ -54,6 +54,31 @@
     };
 }
 
+<style>
+    .token-select-col {
+        width: 42px;
+        text-align: center;
+        vertical-align: middle;
+    }
+    .token-selection-bar {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.75rem 1.25rem;
+        background: var(--card-bg, #1e293b);
+        border: 1px solid var(--accent-primary, #6366f1);
+        border-radius: 8px;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        animation: fadeIn 0.2s ease-in-out;
+    }
+    .token-selection-bar.active {
+        display: flex;
+        flex-wrap: wrap;
+    }
+</style>
+
 <div class="page-header">
     <div>
         <h1 class="page-title">Token & Session Inspector</h1>
@@ -239,19 +264,14 @@
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                     Revoke User Sessions
                 </button>
-                <form method="post" asp-page-handler="RevokeFiltered" id="revoke-filtered-form" style="display:inline; margin:0;">
-                    <input type="hidden" name="SearchTerm" value="@Model.SearchTerm" />
-                    <input type="hidden" name="UserId" value="@Model.UserId" />
-                    <input type="hidden" name="ClientId" value="@Model.ClientId" />
-                    <input type="hidden" name="AuthorizationId" value="@Model.AuthorizationId" />
-                    <input type="hidden" name="CreatedFrom" value="@Model.CreatedFrom?.ToString("yyyy-MM-dd")" />
-                    <input type="hidden" name="CreatedTo" value="@Model.CreatedTo?.ToString("yyyy-MM-dd")" />
-                    <input type="hidden" name="Status" value="@Model.Status" />
-                    <input type="hidden" name="TokenType" value="@Model.TokenType" />
-                    <button type="button" class="btn btn-danger" onclick="openConfirmModal('Revoke Filtered Tokens', 'Revoke ALL tokens matching the currently applied filters? This will immediately invalidate access for those tokens.', () => document.getElementById('revoke-filtered-form').submit())">
-                        Revoke Filtered Tokens
-                    </button>
-                </form>
+                <button type="button" class="btn btn-secondary" id="btn-toggle-select-mode" onclick="toggleTokenSelectionMode()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 11 12 14 22 4"></polyline>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    <span id="btn-toggle-select-text">Select Tokens</span>
+                    <span id="btn-selected-badge" class="badge badge-primary" style="display: none; margin-left: 0.35rem;">0</span>
+                </button>
             </div>
         </div>
 
@@ -299,6 +319,52 @@
         }
     </div>
 
+    <!-- Token Selection Toolbar (Visible when selection mode is active) -->
+    <div id="token-selection-bar" class="token-selection-bar">
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="badge badge-primary" id="selection-counter-badge" style="font-size: 0.85rem; padding: 0.25rem 0.6rem;">0</span>
+                <span style="font-size: 0.9rem; font-weight: 500;">Tokens Selected</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="selectViewedTokens()" title="Select all unrevoked tokens on the current page">
+                    Select Viewed Tokens
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-select-all-filtered" onclick="selectAllFilteredTokens()" title="Select all unrevoked tokens matching current active filters across all pages">
+                    Select All Tokens
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="clearTokenSelection()" title="Deselect all tokens">
+                    Clear Selection
+                </button>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <button type="button" class="btn btn-danger btn-sm" id="btn-revoke-selected" onclick="confirmRevokeSelected()" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -1px; margin-right: 0.25rem;"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+                Revoke Selected (<span id="revoke-btn-count">0</span>)
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="exitTokenSelectionMode()" title="Exit selection mode">
+                ✕ Exit
+            </button>
+        </div>
+    </div>
+
+    <!-- Hidden form to submit multiple revoked tokens -->
+    <form method="post" asp-page-handler="RevokeSelectedTokens" id="revoke-selected-tokens-form" style="display:none;">
+        <input type="hidden" name="activeTab" value="tokens" />
+        <input type="hidden" name="pageNumber" value="@Model.PageNumber" />
+        <input type="hidden" name="pageSize" value="@Model.PageSize" />
+        <input type="hidden" name="searchTerm" value="@Model.SearchTerm" />
+        <input type="hidden" name="userId" value="@Model.UserId" />
+        <input type="hidden" name="clientId" value="@Model.ClientId" />
+        <input type="hidden" name="authorizationId" value="@Model.AuthorizationId" />
+        <input type="hidden" name="createdFrom" value="@Model.CreatedFrom?.ToString("yyyy-MM-dd")" />
+        <input type="hidden" name="createdTo" value="@Model.CreatedTo?.ToString("yyyy-MM-dd")" />
+        <input type="hidden" name="status" value="@Model.Status" />
+        <input type="hidden" name="tokenType" value="@Model.TokenType" />
+        <div id="selected-tokens-inputs-container"></div>
+    </form>
+
     <!-- Token Records Table -->
     <div class="card">
         <div class="card-body" style="padding: 0;">
@@ -306,12 +372,15 @@
                 <table class="table">
                     <thead>
                         <tr>
+                            <th class="token-select-col" style="display: none;">
+                                <input type="checkbox" id="select-all-viewed-checkbox" onchange="toggleSelectViewedCheckbox(this.checked)" title="Select all on this page" style="cursor: pointer;" />
+                            </th>
                             <th>Token ID / Ref</th>
                             <th>Client Application</th>
                             <th>Subject</th>
                             <th>Type</th>
                             <th>Status</th>
-                            <th>Created</th>
+                            <th>Creation Date</th>
                             <th>Expires</th>
                             <th>Serialized Data</th>
                             <th style="text-align: right; width: 80px;">Actions</th>
@@ -321,7 +390,7 @@
                         @if (Model.Tokens.Items.Count == 0)
                         {
                             <tr>
-                                <td colspan="9">
+                                <td colspan="10">
                                     <div class="empty-state">
                                         <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                             <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
@@ -339,21 +408,37 @@
                                 var expiryText = FormatExpiry(token.ExpirationDate);
                                 var typeBadge = GetTokenTypeBadge(token.Type);
                                 var displayId = token.Id.Length > 8 ? token.Id[..8] + "..." : token.Id;
+                                var tokenCreationDate = token.CreationDate ?? token.CreatedAt;
 
                                 <tr data-serialized="@token.SerializedData">
+                                    <td class="token-select-col" style="display: none;">
+                                        @if (!token.IsRevoked)
+                                        {
+                                            <input type="checkbox" class="token-row-checkbox" data-token-id="@token.Id" onchange="onTokenRowCheckboxChange(this)" style="cursor: pointer;" />
+                                        }
+                                        else
+                                        {
+                                            <input type="checkbox" disabled title="Token is revoked" style="opacity: 0.35; cursor: not-allowed;" />
+                                        }
+                                    </td>
                                     <td>
                                         <div style="display: flex; align-items: center; gap: 0.35rem;">
-                                            <code title="@token.Id" style="font-weight: 600;">@displayId</code>
-                                            <button type="button" class="copy-btn" data-copy="@token.Id" onclick="copyToClipboard(this.getAttribute('data-copy'), event)" title="Copy Token ID">
+                                        <code title="@token.Id" style="font-weight: 600;">@displayId</code>
+                                        <button type="button" class="copy-btn" data-copy="@token.Id" onclick="copyToClipboard(this.getAttribute('data-copy'), event)" title="Copy Token ID">
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                        </button>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(token.ReferenceId))
+                                    {
+                                        <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">
+                                            <span title="@token.ReferenceId">
+                                                Ref: @(token.ReferenceId.Length > 10 ? token.ReferenceId[..10] + "..." : token.ReferenceId)
+                                            </span>
+                                            <button type="button" class="copy-btn" data-copy="@token.ReferenceId" onclick="copyToClipboard(this.getAttribute('data-copy'), event)" title="Copy Reference ID">
                                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                             </button>
                                         </div>
-                                        @if (!string.IsNullOrWhiteSpace(token.ReferenceId))
-                                        {
-                                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">
-                                                Ref: @(token.ReferenceId.Length > 10 ? token.ReferenceId[..10] + "..." : token.ReferenceId)
-                                            </div>
-                                        }
+                                    }
                                     </td>
                                     <td>
                                         <div>
@@ -400,7 +485,7 @@
                                             </span>
                                         }
                                     </td>
-                                    <td><span style="color: var(--text-secondary); font-size: 0.85rem;">@(token.CreatedAt?.ToString("g") ?? "-")</span></td>
+                                    <td><span style="color: var(--text-secondary); font-size: 0.85rem;">@(tokenCreationDate?.ToString("g") ?? "-")</span></td>
                                     <td>
                                         <span title="@(token.ExpirationDate?.ToString("g") ?? "Never")" style="font-size: 0.85rem;">@expiryText</span>
                                     </td>
@@ -432,7 +517,7 @@
                                                 </svg>
                                             </button>
                                             <div class="dropdown-menu">
-                                                <button type="button" class="dropdown-item" onclick="openTokenDrawer({ id: '@token.Id', refId: '@(token.ReferenceId ?? "")', clientId: '@(token.ClientId ?? "")', clientName: '@(token.ClientDisplayName ?? "")', subject: '@(token.Subject ?? "")', type: '@(token.Type ?? "")', isRevoked: @(token.IsRevoked.ToString().ToLowerInvariant()), isExpired: @(token.IsExpired.ToString().ToLowerInvariant()), created: '@(token.CreatedAt?.ToString("u") ?? "")', expires: '@(token.ExpirationDate?.ToString("u") ?? "")', revokedAt: '@(token.RevokedAt?.ToString("u") ?? "")', serializedData: this.closest('tr').getAttribute('data-serialized') })">
+                                                <button type="button" class="dropdown-item" onclick="openTokenDrawer({ id: '@token.Id', refId: '@(token.ReferenceId ?? "")', clientId: '@(token.ClientId ?? "")', clientName: '@(token.ClientDisplayName ?? "")', subject: '@(token.Subject ?? "")', type: '@(token.Type ?? "")', isRevoked: @(token.IsRevoked.ToString().ToLowerInvariant()), isExpired: @(token.IsExpired.ToString().ToLowerInvariant()), created: '@(tokenCreationDate?.ToString("u") ?? "")', expires: '@(token.ExpirationDate?.ToString("u") ?? "")', revokedAt: '@(token.RevokedAt?.ToString("u") ?? "")', serializedData: this.closest('tr').getAttribute('data-serialized') })">
                                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                                     <span>Inspect Payload</span>
                                                 </button>
@@ -442,6 +527,10 @@
                                                 </button>
                                                 @if (!token.IsRevoked)
                                                 {
+                                                    <button type="button" class="dropdown-item" onclick="openExtendTokenModal('@token.Id', '@(token.ExpirationDate?.ToString("g") ?? "Never")', @(token.IsExpired.ToString().ToLowerInvariant()))">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                                        <span>Extend Expiration</span>
+                                                    </button>
                                                     <div class="dropdown-divider"></div>
                                                     <form method="post" asp-page-handler="RevokeSingle" id="revoke-token-@token.Id" style="display:block; margin:0;">
                                                         <input type="hidden" name="tokenId" value="@token.Id" />
@@ -775,6 +864,46 @@
     </div>
 </div>
 
+<!-- Modal: Extend Token Expiration -->
+<div id="modal-extend-token" class="modal-backdrop" onclick="closeModal('modal-extend-token')">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <span>Extend Token Expiration</span>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-extend-token')" style="padding: 0.2rem 0.45rem;">✕</button>
+        </div>
+        <form method="post" asp-page-handler="ExtendTokenExpiration" id="extend-token-form">
+            <input type="hidden" name="tokenId" id="extend-token-id-input" />
+            <input type="hidden" name="activeTab" value="tokens" />
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5;">
+                    Add additional validity time to this token in minutes. If the token is already expired, the extension begins from the current time.
+                </p>
+                <div style="margin-bottom: 1.25rem; padding: 0.75rem 1rem; border-radius: 6px; background: rgba(0,0,0,0.15); border: 1px solid var(--border-color, rgba(255,255,255,0.1));">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.15rem;">Token ID</div>
+                    <code id="extend-token-display-id" style="font-size: 0.85rem; font-weight: 600; word-break: break-all;"></code>
+                    <div style="margin-top: 0.65rem; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.15rem;">Current Expiry Status</div>
+                    <div id="extend-token-current-expiry" style="font-size: 0.85rem; font-weight: 500;"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="extend-minutes-input">Additional Time (Minutes)</label>
+                    <input type="number" name="additionalMinutes" id="extend-minutes-input" class="form-control" value="60" min="1" max="525600" required />
+                </div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.65rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('extend-minutes-input').value = 15">+15m</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('extend-minutes-input').value = 30">+30m</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('extend-minutes-input').value = 60">+1 hour</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('extend-minutes-input').value = 1440">+1 day</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('extend-minutes-input').value = 10080">+7 days</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-extend-token')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Extend Expiration</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Slide-Over Drawer for Token Inspection -->
 <div id="token-drawer-backdrop" class="modal-backdrop" onclick="closeTokenDrawer()"></div>
 <div id="token-drawer" class="slide-over-drawer">
@@ -1048,10 +1177,8 @@
                         if (elements && elements.length > 0) {
                             const idx = elements[0].index;
                             const app = rawAppData[idx];
-                            if (selectedClientId === app.ClientId) {
-                                resetTokenChartFilter();
-                            } else {
-                                applyTokenAppFilter(app.ClientId, app.DisplayName || app.ClientId);
+                            if (app && app.ClientId) {
+                                filterByChartApp(app.ClientId);
                             }
                         }
                     }
@@ -1102,10 +1229,8 @@
                         if (elements && elements.length > 0) {
                             const idx = elements[0].index;
                             const app = rawAppData[idx];
-                            if (selectedClientId === app.ClientId) {
-                                resetTokenChartFilter();
-                            } else {
-                                applyTokenAppFilter(app.ClientId, app.DisplayName || app.ClientId);
+                            if (app && app.ClientId) {
+                                filterByChartApp(app.ClientId);
                             }
                         }
                     }
@@ -1175,10 +1300,26 @@
                 }
             }) : null;
 
-            window.applyTokenAppFilter = function(clientId, appName) {
-                selectedClientId = clientId;
+            function filterByChartApp(clientId) {
+                const url = new URL(window.location.href);
+                const currentFilter = url.searchParams.get('ClientId');
+                if (currentFilter === clientId) {
+                    url.searchParams.delete('ClientId');
+                    url.searchParams.delete('SessionClientId');
+                } else {
+                    url.searchParams.set('ClientId', clientId);
+                    url.searchParams.set('SessionClientId', clientId);
+                }
+                url.searchParams.delete('pageNumber');
+                url.searchParams.delete('sessionPageNumber');
+                window.location.href = url.toString();
+            }
 
-                const idx = appClientIds.indexOf(clientId);
+            // Highlight initial selected client if loaded from query string
+            const initialFilteredClientId = '@(Model.ClientId ?? "")';
+            if (initialFilteredClientId) {
+                selectedClientId = initialFilteredClientId;
+                const idx = appClientIds.indexOf(initialFilteredClientId);
                 if (idx >= 0) {
                     const bgColors = appColors.map((c, i) => i === idx ? c : 'rgba(100, 116, 139, 0.2)');
                     if (appsChart) {
@@ -1190,34 +1331,7 @@
                         tokensChart.update();
                     }
                 }
-
-                // Pre-fill filter inputs if present
-                const filterClientId = document.getElementById('filter-client-id');
-                if (filterClientId && !filterClientId.value) {
-                    filterClientId.value = clientId;
-                }
-                const sessionClientId = document.getElementById('session-client-id');
-                if (sessionClientId && !sessionClientId.value) {
-                    sessionClientId.value = clientId;
-                }
-
-                fetchTimelineData(clientId, currentRangeDays);
-            };
-
-            window.resetTokenChartFilter = function() {
-                selectedClientId = null;
-
-                if (appsChart) {
-                    appsChart.data.datasets[0].backgroundColor = [...appColors];
-                    appsChart.update();
-                }
-                if (tokensChart) {
-                    tokensChart.data.datasets[0].backgroundColor = [...appColors];
-                    tokensChart.update();
-                }
-
-                fetchTimelineData(null, currentRangeDays);
-            };
+            }
 
             window.onTokensTimelineRangeChange = function(days) {
                 currentRangeDays = parseInt(days, 10) || 30;
@@ -1248,5 +1362,247 @@
                     .catch(err => console.error('Failed to fetch timeline data:', err));
             }
         })();
+
+        // ===================================================
+        // Token Multi-Selection & Cross-Page Persistence Logic
+        // ===================================================
+        const STORAGE_KEY_SELECTED_TOKENS = 'openiddict_selected_tokens_ids';
+        const STORAGE_KEY_SELECTION_ACTIVE = 'openiddict_token_selection_mode';
+
+        function getSelectedTokenIds() {
+            try {
+                const raw = sessionStorage.getItem(STORAGE_KEY_SELECTED_TOKENS);
+                return raw ? JSON.parse(raw) : [];
+            } catch {
+                return [];
+            }
+        }
+
+        function saveSelectedTokenIds(ids) {
+            try {
+                sessionStorage.setItem(STORAGE_KEY_SELECTED_TOKENS, JSON.stringify(ids));
+            } catch (e) {
+                console.error('Failed to save selected tokens to sessionStorage', e);
+            }
+        }
+
+        function isTokenSelectionMode() {
+            return sessionStorage.getItem(STORAGE_KEY_SELECTION_ACTIVE) === 'true';
+        }
+
+        function setTokenSelectionMode(isActive) {
+            sessionStorage.setItem(STORAGE_KEY_SELECTION_ACTIVE, isActive ? 'true' : 'false');
+            updateSelectionModeUI();
+        }
+
+        function toggleTokenSelectionMode() {
+            setTokenSelectionMode(!isTokenSelectionMode());
+        } 
+
+        function exitTokenSelectionMode() {
+            setTokenSelectionMode(false);
+            clearTokenSelection();
+        }
+
+        function updateSelectionModeUI() {
+            const isActive = isTokenSelectionMode();
+            const bar = document.getElementById('token-selection-bar');
+            const toggleBtn = document.getElementById('btn-toggle-select-mode');
+            const toggleText = document.getElementById('btn-toggle-select-text');
+            const selectCols = document.querySelectorAll('.token-select-col');
+
+            selectCols.forEach(col => {
+                col.style.display = isActive ? '' : 'none';
+            });
+
+            if (bar) {
+                bar.classList.toggle('active', isActive);
+            }
+
+            if (toggleBtn) {
+                toggleBtn.classList.toggle('btn-primary', isActive);
+                toggleBtn.classList.toggle('btn-secondary', !isActive);
+            }
+            if (toggleText) {
+                toggleText.textContent = isActive ? 'Selecting Tokens' : 'Select Tokens';
+            }
+
+            syncTokenCheckboxes();
+        }
+
+        function syncTokenCheckboxes() {
+            const selectedIds = new Set(getSelectedTokenIds());
+            const count = selectedIds.size;
+
+            // Update counter badges and buttons
+            const countBadge = document.getElementById('selection-counter-badge');
+            if (countBadge) countBadge.textContent = count;
+
+            const btnBadge = document.getElementById('btn-selected-badge');
+            if (btnBadge) {
+                btnBadge.textContent = count;
+                btnBadge.style.display = count > 0 ? 'inline-block' : 'none';
+            }
+
+            const revokeBtnCount = document.getElementById('revoke-btn-count');
+            if (revokeBtnCount) revokeBtnCount.textContent = count;
+
+            const revokeBtn = document.getElementById('btn-revoke-selected');
+            if (revokeBtn) revokeBtn.disabled = count === 0;
+
+            // Sync row checkboxes on current page
+            let allViewedChecked = true;
+            let viewedCount = 0;
+            const checkboxes = document.querySelectorAll('.token-row-checkbox');
+
+            checkboxes.forEach(cb => {
+                if (cb.disabled) return;
+                viewedCount++;
+                const id = cb.getAttribute('data-token-id');
+                const isChecked = selectedIds.has(id);
+                cb.checked = isChecked;
+                if (!isChecked) allViewedChecked = false;
+            });
+
+            const headerCb = document.getElementById('select-all-viewed-checkbox');
+            if (headerCb) {
+                headerCb.checked = viewedCount > 0 && allViewedChecked;
+            }
+        }
+
+        function onTokenRowCheckboxChange(cb) {
+            const id = cb.getAttribute('data-token-id');
+            if (!id) return;
+
+            const selected = new Set(getSelectedTokenIds());
+            if (cb.checked) {
+                selected.add(id);
+            } else {
+                selected.delete(id);
+            }
+            saveSelectedTokenIds(Array.from(selected));
+            syncTokenCheckboxes();
+        }
+
+        function toggleSelectViewedCheckbox(checked) {
+            const selected = new Set(getSelectedTokenIds());
+            const checkboxes = document.querySelectorAll('.token-row-checkbox');
+            checkboxes.forEach(cb => {
+                if (cb.disabled) return;
+                cb.checked = checked;
+                const id = cb.getAttribute('data-token-id');
+                if (id) {
+                    if (checked) selected.add(id);
+                    else selected.delete(id);
+                }
+            });
+            saveSelectedTokenIds(Array.from(selected));
+            syncTokenCheckboxes();
+        }
+
+        function selectViewedTokens() {
+            toggleSelectViewedCheckbox(true);
+        }
+
+        async function selectAllFilteredTokens() {
+            const btn = document.getElementById('btn-select-all-filtered');
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = 'Fetching all...';
+            }
+
+            try {
+                // Fetch unrevoked token IDs matching current filters via AJAX
+                const url = new URL(window.location.href);
+                url.searchParams.set('handler', 'AllTokenIds');
+                const res = await fetch(url.toString());
+                if (res.ok) {
+                    const ids = await res.json();
+                    if (Array.isArray(ids)) {
+                        const current = new Set(getSelectedTokenIds());
+                        ids.forEach(id => current.add(id));
+                        saveSelectedTokenIds(Array.from(current));
+                        syncTokenCheckboxes();
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch all matching token IDs:', err);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            }
+        }
+
+        function clearTokenSelection() {
+            saveSelectedTokenIds([]);
+            syncTokenCheckboxes();
+        }
+
+        function confirmRevokeSelected() {
+            const ids = getSelectedTokenIds();
+            if (ids.length === 0) {
+                alert('Please select at least one token to revoke.');
+                return;
+            }
+
+            openConfirmModal(
+                'Revoke Selected Tokens',
+                `Are you sure you want to revoke ${ids.length} selected token(s) across all pages immediately?`,
+                () => {
+                    const form = document.getElementById('revoke-selected-tokens-form');
+                    const container = document.getElementById('selected-tokens-inputs-container');
+                    if (!form || !container) return;
+
+                    container.innerHTML = '';
+                    ids.forEach(id => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'selectedTokenIds';
+                        input.value = id;
+                        container.appendChild(input);
+                    });
+
+                    // Clear storage before submission
+                    sessionStorage.removeItem(STORAGE_KEY_SELECTED_TOKENS);
+                    sessionStorage.removeItem(STORAGE_KEY_SELECTION_ACTIVE);
+
+                    form.submit();
+                }
+            );
+        }
+
+        // ============================================
+        // Extend Token Expiration Modal
+        // ============================================
+        function openExtendTokenModal(tokenId, currentExpiry, isExpired) {
+            const idInput = document.getElementById('extend-token-id-input');
+            const displayId = document.getElementById('extend-token-display-id');
+            const expiryDiv = document.getElementById('extend-token-current-expiry');
+            const minutesInput = document.getElementById('extend-minutes-input');
+
+            if (idInput) idInput.value = tokenId;
+            if (displayId) displayId.textContent = tokenId;
+            if (expiryDiv) {
+                if (isExpired === true || isExpired === 'true') {
+                    expiryDiv.innerHTML = `<span style="color: var(--warning-color, #f59e0b);">Expired (${currentExpiry}) - Extension starts from Now</span>`;
+                } else {
+                    expiryDiv.innerHTML = `<span style="color: var(--success-color, #10b981);">${currentExpiry}</span>`;
+                }
+            }
+            if (minutesInput) minutesInput.value = 60;
+
+            openModal('modal-extend-token');
+        }
+
+        // Initialize selection mode and restore checkboxes on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const selected = getSelectedTokenIds();
+            if (isTokenSelectionMode() || selected.length > 0) {
+                setTokenSelectionMode(true);
+            }
+        });
     </script>
 }

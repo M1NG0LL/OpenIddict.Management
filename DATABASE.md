@@ -122,12 +122,13 @@ This internally calls:
 
 ## Store Implementations
 
-The `Storage.EfCore` package provides three EF Core store implementations:
+The `Storage.EfCore` package provides four EF Core store implementations:
 
 | Interface | Implementation | Description |
 |---|---|---|
 | `IApplicationManagementService` | `EfCoreApplicationManagementStore<TContext, TKey>` | Full application CRUD with filtering, pagination, status management |
-| `IOpenIddictRevocationManager` | `EfCoreRevocationStore<TContext, TKey>` | Token/authorization revocation, listing, pruning, counts |
+| `IOpenIddictTokenManager` | `EfCoreTokenStore<TContext, TKey>` | Token queries, timeline analytics, counts, extension, revocation, pruning |
+| `IOpenIddictAuthorizationManager` | `EfCoreAuthorizationStore<TContext, TKey>` | Session / authorization listing, active counts, session revocation |
 | `IScopeManagementService` | `EfCoreScopeManagementStore<TContext, TKey>` | Scope CRUD with pagination and search |
 
 ---

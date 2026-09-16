@@ -18,7 +18,7 @@ internal static class RevocationEndpointsGroup
 
         revocationGroup.MapPost("/by-user", async (
             [FromBody] RevocationByUserRequest request,
-            [FromServices] IOpenIddictRevocationManager manager,
+            [FromServices] IOpenIddictTokenManager manager,
             CancellationToken cancellationToken) =>
         {
             var result = await manager.RevokeByUserAsync(request.UserId, cancellationToken);
@@ -32,7 +32,7 @@ internal static class RevocationEndpointsGroup
 
         revocationGroup.MapPost("/by-client", async (
             [FromBody] RevocationByClientRequest request,
-            [FromServices] IOpenIddictRevocationManager manager,
+            [FromServices] IOpenIddictTokenManager manager,
             CancellationToken cancellationToken) =>
         {
             var result = await manager.RevokeByClientAsync(request.ClientId, cancellationToken);
@@ -46,7 +46,7 @@ internal static class RevocationEndpointsGroup
 
         revocationGroup.MapPost("/by-session", async (
             [FromBody] RevocationBySessionRequest request,
-            [FromServices] IOpenIddictRevocationManager manager,
+            [FromServices] IOpenIddictAuthorizationManager manager,
             CancellationToken cancellationToken) =>
         {
             var result = await manager.RevokeSessionAuthorizationsAsync(request.UserId, request.AuthorizationId, cancellationToken);
@@ -59,7 +59,7 @@ internal static class RevocationEndpointsGroup
         .Produces(StatusCodes.Status400BadRequest);
 
         revocationGroup.MapPost("/prune", async (
-            [FromServices] IOpenIddictRevocationManager manager,
+            [FromServices] IOpenIddictTokenManager manager,
             int? batchSize,
             bool? includeRevoked,
             CancellationToken cancellationToken) =>

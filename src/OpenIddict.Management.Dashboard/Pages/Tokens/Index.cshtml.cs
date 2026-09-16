@@ -9,7 +9,8 @@ namespace OpenIddict.Management.Dashboard.Pages.Tokens;
 /// Page model for Token &amp; Session Inspector, listing, filtering, analytics, and revocation management.
 /// </summary>
 public class IndexModel(
-    IOpenIddictRevocationManager revocationManager,
+    IOpenIddictTokenManager tokenManager,
+    IOpenIddictAuthorizationManager authorizationManager,
     ITokenCleanupJobManager? cleanupJobManager = null) : PageModel
 {
     /// <summary>Gets or sets the active view tab ("tokens" or "sessions").</summary>
@@ -166,13 +167,13 @@ public class IndexModel(
     {
         // 1. Load Tokens
         var filter = BuildFilterRequest();
-        var result = await revocationManager.ListTokensAsync(filter, cancellationToken);
+        var result = await tokenManager.ListTokensAsync(filter, cancellationToken);
         if (result.IsSuccess && result.Value is not null)
         {
             Tokens = result.Value;
         }
 
-        var countsResult = await revocationManager.GetTokenCountsAsync(cancellationToken);
+        var countsResult = await tokenManager.GetTokenCountsAsync(cancellationToken);
         if (countsResult.IsSuccess && countsResult.Value is not null)
         {
             TokenCounts = countsResult.Value;
@@ -188,7 +189,7 @@ public class IndexModel(
             ClientId = SessionClientId,
             Status = SessionStatus
         };
-        var sessionsResult = await revocationManager.ListSessionsAsync(sessionFilter, cancellationToken);
+        var sessionsResult = await authorizationManager.ListSessionsAsync(sessionFilter, cancellationToken);
         if (sessionsResult.IsSuccess && sessionsResult.Value is not null)
         {
             Sessions = sessionsResult.Value;
@@ -197,13 +198,13 @@ public class IndexModel(
         // 3. Load Chart Data
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var fromDate = today.AddDays(-29);
-        var appCountsResult = await revocationManager.GetTokenCountsByApplicationAsync(cancellationToken);
+        var appCountsResult = await tokenManager.GetTokenCountsByApplicationAsync(cancellationToken);
         if (appCountsResult.IsSuccess && appCountsResult.Value is not null)
         {
             AppTokenCounts = appCountsResult.Value;
         }
 
-        var timelineResult = await revocationManager.GetTokenTimelineAsync(fromDate, today, null, cancellationToken);
+        var timelineResult = await tokenManager.GetTokenTimelineAsync(fromDate, today, null, cancellationToken);
         if (timelineResult.IsSuccess && timelineResult.Value is not null)
         {
             TokenTimeline = timelineResult.Value;
@@ -235,7 +236,7 @@ public class IndexModel(
             return RedirectToPage(GetRouteValues());
         }
 
-        var result = await revocationManager.RevokeByTokenIdAsync(tokenId, cancellationToken);
+        var result = await tokenManager.RevokeByTokenIdAsync(tokenId, cancellationToken);
         IsSuccess = result.IsSuccess;
         Message = result.IsSuccess
             ? $"Token '{tokenId}' revoked successfully."
@@ -249,7 +250,7 @@ public class IndexModel(
     public async Task<IActionResult> OnPostRevokeFilteredAsync(CancellationToken cancellationToken)
     {
         var filter = BuildFilterRequest();
-        var result = await revocationManager.RevokeTokensWithFilterAsync(filter, cancellationToken);
+        var result = await tokenManager.RevokeTokensWithFilterAsync(filter, cancellationToken);
 
         IsSuccess = result.IsSuccess;
         if (result.IsSuccess)
@@ -265,6 +266,98 @@ public class IndexModel(
         return RedirectToPage(GetRouteValues());
     }
 
+    /// <summary>Handles POST requests for extending the expiration of one or more tokens.</summary>
+    public async Task<IActionResult> OnPostExtendTokenExpirationAsync(string? tokenId, List<string>? tokenIds, int additionalMinutes, CancellationToken cancellationToken)
+    {
+        var ids = new List<string>();
+        if (!string.IsNullOrWhiteSpace(tokenId))
+        {
+            ids.Add(tokenId.Trim());
+        }
+        if (tokenIds is not null)
+        {
+            ids.AddRange(tokenIds.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()));
+        }
+
+        ids = ids.Distinct().ToList();
+
+        if (ids.Count == 0)
+        {
+            Message = "No token ID was specified for expiration extension.";
+            IsSuccess = false;
+            ActiveTab = "tokens";
+            return RedirectToPage(GetRouteValues());
+        }
+
+        if (additionalMinutes <= 0)
+        {
+            Message = "Additional expiration minutes must be greater than zero.";
+            IsSuccess = false;
+            ActiveTab = "tokens";
+            return RedirectToPage(GetRouteValues());
+        }
+
+        var result = await tokenManager.ExtendTokenExpirationAsync(ids, additionalMinutes, cancellationToken);
+        IsSuccess = result.IsSuccess;
+        Message = result.IsSuccess
+            ? $"Successfully extended expiration by {additionalMinutes} minute(s) for {result.Value} token(s)."
+            : (result.Error?.Description ?? "Failed to extend token expiration.");
+        ActiveTab = "tokens";
+
+        return RedirectToPage(GetRouteValues());
+    }
+
+    /// <summary>Handles POST requests for revoking multiple selected tokens.</summary>
+    public async Task<IActionResult> OnPostRevokeSelectedTokensAsync(List<string> selectedTokenIds, CancellationToken cancellationToken)
+    {
+        var ids = selectedTokenIds?.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList() ?? [];
+        if (ids.Count == 0)
+        {
+            Message = "No tokens were selected for revocation.";
+            IsSuccess = false;
+            ActiveTab = "tokens";
+            return RedirectToPage(GetRouteValues());
+        }
+
+        var result = await tokenManager.RevokeMultipleTokensAsync(ids, cancellationToken);
+        IsSuccess = result.IsSuccess;
+        Message = result.IsSuccess
+            ? $"Successfully revoked {result.Value?.TokensRevoked ?? 0} selected token(s)."
+            : (result.Error?.Description ?? "Failed to revoke selected tokens.");
+        ActiveTab = "tokens";
+
+        return RedirectToPage(GetRouteValues());
+    }
+
+    /// <summary>Handles AJAX requests to get all unrevoked token IDs matching current filters for bulk selection.</summary>
+    public async Task<IActionResult> OnGetAllTokenIdsAsync(CancellationToken cancellationToken)
+    {
+        var filter = new TokenFilterRequest
+        {
+            PageIndex = 1,
+            PageSize = 10000,
+            SearchTerm = SearchTerm,
+            UserId = UserId,
+            ClientId = ClientId,
+            AuthorizationId = AuthorizationId,
+            CreatedFrom = CreatedFrom.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(CreatedFrom.Value, DateTimeKind.Utc)) : null,
+            CreatedTo = CreatedTo.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(CreatedTo.Value, DateTimeKind.Utc).Date.AddDays(1).AddTicks(-1)) : null,
+            Status = Status,
+            TokenType = TokenType
+        };
+        var result = await tokenManager.ListTokensAsync(filter, cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+        {
+            var unrevokedIds = result.Value.Items
+                .Where(t => !t.IsRevoked)
+                .Select(t => t.Id)
+                .ToList();
+            return new JsonResult(unrevokedIds);
+        }
+
+        return new JsonResult(Array.Empty<string>());
+    }
+
     /// <summary>Handles POST requests for bulk revoking user tokens.</summary>
     public async Task<IActionResult> OnPostRevokeUserTokensAsync(string targetUserId, CancellationToken cancellationToken)
     {
@@ -276,7 +369,7 @@ public class IndexModel(
             return RedirectToPage(GetRouteValues());
         }
 
-        var result = await revocationManager.RevokeByUserAsync(targetUserId, cancellationToken);
+        var result = await tokenManager.RevokeByUserAsync(targetUserId, cancellationToken);
         IsSuccess = result.IsSuccess;
         Message = result.IsSuccess
             ? $"Tokens for user '{targetUserId}' revoked ({result.Value?.TokensRevoked ?? 0} tokens)."
@@ -297,7 +390,7 @@ public class IndexModel(
             return RedirectToPage(GetRouteValues());
         }
 
-        var result = await revocationManager.RevokeByClientAsync(targetClientId, cancellationToken);
+        var result = await tokenManager.RevokeByClientAsync(targetClientId, cancellationToken);
         IsSuccess = result.IsSuccess;
         Message = result.IsSuccess
             ? $"Tokens for client '{targetClientId}' revoked ({result.Value?.TokensRevoked ?? 0} tokens)."
@@ -318,7 +411,7 @@ public class IndexModel(
             return RedirectToPage(GetRouteValues());
         }
 
-        var result = await revocationManager.RevokeSessionAuthorizationsAsync(authorizationId: authorizationId, cancellationToken: cancellationToken);
+        var result = await authorizationManager.RevokeSessionAuthorizationsAsync(authorizationId: authorizationId, cancellationToken: cancellationToken);
         IsSuccess = result.IsSuccess;
         Message = result.IsSuccess
             ? $"Session '{authorizationId}' revoked successfully ({result.Value?.TokensRevoked ?? 0} tokens revoked)."
@@ -339,7 +432,7 @@ public class IndexModel(
             return RedirectToPage(GetRouteValues());
         }
 
-        var result = await revocationManager.RevokeSessionAuthorizationsAsync(userId: targetUserId, cancellationToken: cancellationToken);
+        var result = await authorizationManager.RevokeSessionAuthorizationsAsync(userId: targetUserId, cancellationToken: cancellationToken);
         IsSuccess = result.IsSuccess;
         Message = result.IsSuccess
             ? $"All sessions for user '{targetUserId}' revoked ({result.Value?.AuthorizationsRevoked ?? 0} authorizations, {result.Value?.TokensRevoked ?? 0} tokens)."
@@ -354,14 +447,14 @@ public class IndexModel(
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var fromDate = today.AddDays(-Math.Max(1, days - 1));
-        var result = await revocationManager.GetTokenTimelineAsync(fromDate, today, clientId, cancellationToken);
+        var result = await tokenManager.GetTokenTimelineAsync(fromDate, today, clientId, cancellationToken);
         return new JsonResult(result.IsSuccess && result.Value is not null ? result.Value : []);
     }
 
     /// <summary>Handles AJAX requests for fetching per-application token counts.</summary>
     public async Task<IActionResult> OnGetTokensByAppAsync(string? clientId = null, CancellationToken cancellationToken = default)
     {
-        var result = await revocationManager.GetTokenCountsByApplicationAsync(cancellationToken);
+        var result = await tokenManager.GetTokenCountsByApplicationAsync(cancellationToken);
         var data = result.IsSuccess && result.Value is not null ? result.Value : [];
         if (!string.IsNullOrWhiteSpace(clientId))
         {

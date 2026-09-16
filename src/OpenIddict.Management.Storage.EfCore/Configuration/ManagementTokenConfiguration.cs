@@ -18,7 +18,6 @@ public class ManagementTokenConfiguration<TKey> : IEntityTypeConfiguration<Manag
 
         builder.ToTable("OpenIddictTokens");
 
-        builder.HasIndex(t => t.CreatedAt);
         builder.HasIndex(t => t.RevokedAt);
     }
 }

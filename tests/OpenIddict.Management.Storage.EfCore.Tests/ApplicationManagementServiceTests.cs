@@ -797,7 +797,7 @@ public class ApplicationManagementServiceTests : IDisposable
             Subject = "user-1",
             Type = "access_token",
             Status = "valid",
-            CreatedAt = DateTimeOffset.UtcNow
+            CreationDate = DateTime.UtcNow
         };
         var token2 = new ManagementToken<Guid>
         {
@@ -807,7 +807,7 @@ public class ApplicationManagementServiceTests : IDisposable
             Subject = "user-1",
             Type = "refresh_token",
             Status = "valid",
-            CreatedAt = DateTimeOffset.UtcNow
+            CreationDate = DateTime.UtcNow
         };
         context.Tokens.AddRange(token1, token2);
         await context.SaveChangesAsync();

@@ -1,4 +1,4 @@
-using OpenIddict.Abstractions;
+using Abstractions = OpenIddict.Abstractions;
 using OpenIddict.Management.Contracts;
 using OpenIddict.Management.Dto;
 
@@ -10,9 +10,10 @@ namespace OpenIddict.Management.Dashboard.Services;
 public class OpenIddictDashboardService(
     IApplicationManagementService? applicationService = null,
     IScopeManagementService? scopeService = null,
-    IOpenIddictRevocationManager? revocationManager = null,
+    IOpenIddictTokenManager? tokenManager = null,
     IOpenIddictAuthorizationManager? authorizationManager = null,
-    IOpenIddictTokenManager? tokenManager = null) : IOpenIddictDashboardService
+    Abstractions.IOpenIddictAuthorizationManager? coreAuthorizationManager = null,
+    Abstractions.IOpenIddictTokenManager? coreTokenManager = null) : IOpenIddictDashboardService
 {
     /// <inheritdoc/>
     public virtual async Task<DashboardOverviewDto> GetOverviewMetricsAsync(CancellationToken cancellationToken = default)
@@ -41,32 +42,32 @@ public class OpenIddictDashboardService(
 
         int totalTokens = 0;
         int revokedTokens = 0;
-        if (revocationManager is not null)
+        if (tokenManager is not null)
         {
-            var tokenCountsResult = await revocationManager.GetTokenCountsAsync(cancellationToken);
+            var tokenCountsResult = await tokenManager.GetTokenCountsAsync(cancellationToken);
             if (tokenCountsResult.IsSuccess && tokenCountsResult.Value is not null)
             {
                 totalTokens = tokenCountsResult.Value.Total;
                 revokedTokens = tokenCountsResult.Value.Revoked;
             }
         }
-        else if (tokenManager is not null)
+        else if (coreTokenManager is not null)
         {
-            totalTokens = (int)await tokenManager.CountAsync(cancellationToken);
+            totalTokens = (int)await coreTokenManager.CountAsync(cancellationToken);
         }
 
         int activeAuthorizations = 0;
-        if (revocationManager is not null)
+        if (authorizationManager is not null)
         {
-            var authResult = await revocationManager.GetActiveAuthorizationsCountAsync(cancellationToken);
+            var authResult = await authorizationManager.GetActiveAuthorizationsCountAsync(cancellationToken);
             if (authResult.IsSuccess)
             {
                 activeAuthorizations = authResult.Value;
             }
         }
-        else if (authorizationManager is not null)
+        else if (coreAuthorizationManager is not null)
         {
-            activeAuthorizations = (int)await authorizationManager.CountAsync(cancellationToken);
+            activeAuthorizations = (int)await coreAuthorizationManager.CountAsync(cancellationToken);
         }
 
         return new DashboardOverviewDto
@@ -83,12 +84,12 @@ public class OpenIddictDashboardService(
     /// <inheritdoc/>
     public virtual async Task<List<ApplicationTokenCountDto>> GetTokenCountsByApplicationAsync(CancellationToken ct = default)
     {
-        if (revocationManager is null)
+        if (tokenManager is null)
         {
             return [];
         }
 
-        var result = await revocationManager.GetTokenCountsByApplicationAsync(ct);
+        var result = await tokenManager.GetTokenCountsByApplicationAsync(ct);
         return result.IsSuccess && result.Value is not null ? result.Value : [];
     }
 
@@ -99,12 +100,12 @@ public class OpenIddictDashboardService(
         string? clientId = null,
         CancellationToken ct = default)
     {
-        if (revocationManager is null)
+        if (tokenManager is null)
         {
             return [];
         }
 
-        var result = await revocationManager.GetTokenTimelineAsync(from, to, clientId, ct);
+        var result = await tokenManager.GetTokenTimelineAsync(from, to, clientId, ct);
         return result.IsSuccess && result.Value is not null ? result.Value : [];
     }
 }

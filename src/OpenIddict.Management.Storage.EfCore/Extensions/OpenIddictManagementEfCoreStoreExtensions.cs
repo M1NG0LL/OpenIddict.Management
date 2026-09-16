@@ -17,7 +17,7 @@ public static class OpenIddictManagementEfCoreStoreExtensions
 {
     /// <summary>
     /// Registers default EF Core implementations of OpenIddict Management services (<see cref="IApplicationManagementService"/>,
-    /// <see cref="IOpenIddictRevocationManager"/>, <see cref="IScopeManagementService"/>) and configures OpenIddict Core
+    /// <see cref="IOpenIddictTokenManager"/>, <see cref="IOpenIddictAuthorizationManager"/>, <see cref="IScopeManagementService"/>) and configures OpenIddict Core
     /// default entity types using <see cref="Guid"/> key type.
     /// </summary>
     /// <typeparam name="TContext">The target DbContext type.</typeparam>
@@ -46,7 +46,8 @@ public static class OpenIddictManagementEfCoreStoreExtensions
         services.TryAddSingleton(TimeProvider.System);
 
         services.TryAddScoped<IApplicationManagementService, EfCoreApplicationManagementStore<TContext, TKey>>();
-        services.TryAddScoped<IOpenIddictRevocationManager, EfCoreRevocationStore<TContext, TKey>>();
+        services.TryAddScoped<IOpenIddictTokenManager, EfCoreTokenStore<TContext, TKey>>();
+        services.TryAddScoped<IOpenIddictAuthorizationManager, EfCoreAuthorizationStore<TContext, TKey>>();
         services.TryAddScoped<IScopeManagementService, EfCoreScopeManagementStore<TContext, TKey>>();
 
         services.AddOpenIddict()
@@ -139,13 +140,15 @@ public static class OpenIddictManagementEfCoreStoreExtensions
     /// Registers custom store implementations for all OpenIddict Management services, replacing any existing store registrations.
     /// </summary>
     /// <typeparam name="TAppStore">The application management service implementation type.</typeparam>
-    /// <typeparam name="TRevocationStore">The revocation manager implementation type.</typeparam>
+    /// <typeparam name="TTokenStore">The token manager implementation type.</typeparam>
+    /// <typeparam name="TAuthStore">The authorization manager implementation type.</typeparam>
     /// <typeparam name="TScopeStore">The scope management service implementation type.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <returns>The modified service collection.</returns>
-    public static IServiceCollection AddOpenIddictManagementStores<TAppStore, TRevocationStore, TScopeStore>(this IServiceCollection services)
+    public static IServiceCollection AddOpenIddictManagementStores<TAppStore, TTokenStore, TAuthStore, TScopeStore>(this IServiceCollection services)
         where TAppStore : class, IApplicationManagementService
-        where TRevocationStore : class, IOpenIddictRevocationManager
+        where TTokenStore : class, IOpenIddictTokenManager
+        where TAuthStore : class, IOpenIddictAuthorizationManager
         where TScopeStore : class, IScopeManagementService
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -153,7 +156,8 @@ public static class OpenIddictManagementEfCoreStoreExtensions
         services.TryAddSingleton(TimeProvider.System);
 
         services.Replace(ServiceDescriptor.Scoped<IApplicationManagementService, TAppStore>());
-        services.Replace(ServiceDescriptor.Scoped<IOpenIddictRevocationManager, TRevocationStore>());
+        services.Replace(ServiceDescriptor.Scoped<IOpenIddictTokenManager, TTokenStore>());
+        services.Replace(ServiceDescriptor.Scoped<IOpenIddictAuthorizationManager, TAuthStore>());
         services.Replace(ServiceDescriptor.Scoped<IScopeManagementService, TScopeStore>());
 
         return services;
@@ -176,18 +180,34 @@ public static class OpenIddictManagementEfCoreStoreExtensions
     }
 
     /// <summary>
-    /// Registers or replaces a custom implementation for <see cref="IOpenIddictRevocationManager"/>.
+    /// Registers or replaces a custom implementation for <see cref="IOpenIddictTokenManager"/>.
     /// </summary>
-    /// <typeparam name="TStore">The revocation manager implementation type.</typeparam>
+    /// <typeparam name="TStore">The token manager implementation type.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <returns>The modified service collection.</returns>
-    public static IServiceCollection AddRevocationStore<TStore>(this IServiceCollection services)
-        where TStore : class, IOpenIddictRevocationManager
+    public static IServiceCollection AddTokenStore<TStore>(this IServiceCollection services)
+        where TStore : class, IOpenIddictTokenManager
     {
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton(TimeProvider.System);
-        services.Replace(ServiceDescriptor.Scoped<IOpenIddictRevocationManager, TStore>());
+        services.Replace(ServiceDescriptor.Scoped<IOpenIddictTokenManager, TStore>());
+        return services;
+    }
+
+    /// <summary>
+    /// Registers or replaces a custom implementation for <see cref="IOpenIddictAuthorizationManager"/>.
+    /// </summary>
+    /// <typeparam name="TStore">The authorization manager implementation type.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The modified service collection.</returns>
+    public static IServiceCollection AddAuthorizationStore<TStore>(this IServiceCollection services)
+        where TStore : class, IOpenIddictAuthorizationManager
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.Replace(ServiceDescriptor.Scoped<IOpenIddictAuthorizationManager, TStore>());
         return services;
     }
 

@@ -31,6 +31,13 @@ public sealed record TokenListDto
     private readonly DateTimeOffset? _revokedAt;
 
     /// <summary>Gets the UTC timestamp when the token was created.</summary>
+    public DateTimeOffset? CreationDate
+    {
+        get => _createdAt;
+        init => _createdAt = value?.ToUniversalTime();
+    }
+
+    /// <summary>Gets the UTC timestamp when the token was created (alias for CreationDate).</summary>
     public DateTimeOffset? CreatedAt
     {
         get => _createdAt;
