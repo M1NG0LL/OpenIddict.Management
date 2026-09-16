@@ -473,8 +473,6 @@ public class ApplicationManagementServiceTests : IDisposable
         updated.DisplayName.Should().Be("Updated Name");
         updated.Environment.Should().Be(ApplicationEnvironment.Production);
         updated.Description.Should().Be("Updated Description");
-        updated.LogoUri.Should().Be("https://example.com/updated.png");
-        updated.OwnerUserId.Should().Be("user-2");
         updated.ExtraData.Should().Be("{\"version\":2}");
         updated.Tags.Should().BeEquivalentTo(["Production", "Core"]);
         updated.AllowedRoles.Should().BeEquivalentTo(["Admin", "SuperUser"]);

@@ -19,8 +19,6 @@ internal static class ApplicationMapper
             Environment = entity.Environment,
             AllowedRoles = entity.GetAllowedRoles(),
             Description = entity.Description,
-            LogoUri = entity.LogoUri,
-            OwnerUserId = entity.OwnerUserId,
             CreatedAt = entity.CreatedAt,
             LastModifiedAt = entity.LastModifiedAt,
             ExtraData = entity.ExtraData,
@@ -43,7 +41,6 @@ internal static class ApplicationMapper
             DisplayName = entity.DisplayName,
             Status = entity.Status,
             Environment = entity.Environment,
-            OwnerUserId = entity.OwnerUserId,
             Tags = entity.Tags ?? [],
             CreatedAt = entity.CreatedAt
         };

@@ -122,8 +122,7 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
             var search = request.Search.Trim();
             query = query.Where(a =>
                 (a.ClientId != null && EF.Functions.Like(a.ClientId, $"%{search}%")) ||
-                (a.DisplayName != null && EF.Functions.Like(a.DisplayName, $"%{search}%")) ||
-                (a.OwnerUserId != null && EF.Functions.Like(a.OwnerUserId, $"%{search}%")));
+                (a.DisplayName != null && EF.Functions.Like(a.DisplayName, $"%{search}%")));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
@@ -138,8 +137,6 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
                 => request.SortDescending ? query.OrderByDescending(a => a.Status) : query.OrderBy(a => a.Status),
             var s when string.Equals(s, ApplicationSortProperties.Environment, StringComparison.OrdinalIgnoreCase)
                 => request.SortDescending ? query.OrderByDescending(a => a.Environment) : query.OrderBy(a => a.Environment),
-            var s when string.Equals(s, ApplicationSortProperties.OwnerUserId, StringComparison.OrdinalIgnoreCase)
-                => request.SortDescending ? query.OrderByDescending(a => a.OwnerUserId) : query.OrderBy(a => a.OwnerUserId),
             _ => request.SortDescending ? query.OrderByDescending(a => a.Id) : query.OrderBy(a => a.Id)
         };
 
@@ -182,8 +179,6 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
         entity.Status = ApplicationStatus.Active;
         entity.Environment = dto.Environment;
         entity.Description = dto.Description;
-        entity.LogoUri = dto.LogoUri;
-        entity.OwnerUserId = dto.OwnerUserId;
         entity.ExtraData = dto.ExtraData;
         entity.Tags = dto.Tags?.ToList() ?? [];
         entity.CreatedAt = now;
@@ -238,8 +233,6 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
         entity.Status = dto.Status;
         entity.Environment = dto.Environment;
         entity.Description = dto.Description;
-        entity.LogoUri = dto.LogoUri;
-        entity.OwnerUserId = dto.OwnerUserId;
         entity.ExtraData = dto.ExtraData;
         entity.Tags = dto.Tags?.ToList() ?? [];
         entity.LastModifiedAt = now;

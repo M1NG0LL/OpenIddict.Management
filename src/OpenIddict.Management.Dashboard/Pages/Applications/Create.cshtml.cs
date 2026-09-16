@@ -43,6 +43,10 @@ public class CreateModel(
     [BindProperty]
     public string? RedirectUrisText { get; set; }
 
+    /// <summary>Gets or sets raw post-logout redirect URIs text.</summary>
+    [BindProperty]
+    public string? PostLogoutRedirectUrisText { get; set; }
+
     /// <summary>Gets or sets selected tags from predefined configuration.</summary>
     [BindProperty]
     public List<string> SelectedTags { get; set; } = [];
@@ -118,6 +122,18 @@ public class CreateModel(
             }
         }
 
+        var postLogoutRedirectUris = (PostLogoutRedirectUrisText ?? string.Empty)
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+        foreach (var uri in postLogoutRedirectUris)
+        {
+            if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsed) || !parsed.IsWellFormedOriginalString() || string.IsNullOrWhiteSpace(parsed.Scheme))
+            {
+                ModelState.AddModelError(nameof(PostLogoutRedirectUrisText), $"Post-logout redirect URI '{uri}' is not a valid absolute URI (e.g. 'https://localhost:5001/signout-callback-oidc').");
+            }
+        }
+
         if (!ModelState.IsValid)
         {
             await LoadCustomScopesAsync(cancellationToken);
@@ -167,6 +183,7 @@ public class CreateModel(
             Environment = Environment,
             Description = Description,
             RedirectUris = redirectUris,
+            PostLogoutRedirectUris = postLogoutRedirectUris,
             Permissions = permissionsSet.ToList(),
             DefaultScopes = defaultScopesSet.ToList(),
             Tags = tagsSet.ToList()
