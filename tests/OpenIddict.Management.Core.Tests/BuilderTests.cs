@@ -15,7 +15,7 @@ public class BuilderTests
         public Task<LoginResult> AuthenticateAsync(LoginContext context, CancellationToken cancellationToken = default)
             => Task.FromResult(LoginResult.Success("custom_user", "custom_name"));
     }
-
+ 
     private sealed class CustomLoginEngine : IOpenIddictLoginEngine
     {
         public Task<LoginResult> AuthenticateAsync(LoginContext context, CancellationToken cancellationToken = default)
