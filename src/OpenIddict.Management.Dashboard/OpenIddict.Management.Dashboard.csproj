@@ -6,6 +6,7 @@
     <PackageTags>openiddict;identity;dashboard;admin;ui;razor-pages;aspnetcore;management</PackageTags>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
     <StaticWebAssetsEnabled>true</StaticWebAssetsEnabled>
+    <StaticWebAssetBasePath>_content/Mingoll.OpenIddict.Management.Dashboard</StaticWebAssetBasePath>
   </PropertyGroup>
 
   <ItemGroup>
