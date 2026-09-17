@@ -1,14 +1,29 @@
 namespace OpenIddict.Management.Results;
 
 /// <summary>
-/// Represents structured error details for a failed operation containing an error header and description.
+/// Represents structured error details for a failed operation containing an error code and description.
 /// </summary>
 public sealed record ManagementError
 {
+    private readonly string? _code;
+
     /// <summary>
-    /// Gets the error header or code (e.g., "EntityNotFound", "DuplicateEntity", "ValidationFailed").
+    /// Gets the error code (e.g., "EntityNotFound", "DuplicateEntity", "ValidationFailed").
     /// </summary>
-    public required string Header { get; init; }
+    public string Code
+    {
+        get => _code ?? Header ?? string.Empty;
+        init => _code = value;
+    }
+
+    /// <summary>
+    /// Gets the error header or code (alias for <see cref="Code"/>).
+    /// </summary>
+    public string Header
+    {
+        get => _code ?? string.Empty;
+        init => _code = value;
+    }
 
     /// <summary>
     /// Gets the detailed description of the error.
@@ -25,7 +40,7 @@ public sealed record ManagementError
     /// </summary>
     public static ManagementError EntityNotFound(string entityName, object id) => new()
     {
-        Header = "EntityNotFound",
+        Code = "EntityNotFound",
         Description = $"Entity of type '{entityName}' with ID '{id}' was not found."
     };
 
@@ -34,7 +49,7 @@ public sealed record ManagementError
     /// </summary>
     public static ManagementError DuplicateEntity(string entityName, string propertyName, object value) => new()
     {
-        Header = "DuplicateEntity",
+        Code = "DuplicateEntity",
         Description = $"An entity of type '{entityName}' with {propertyName} '{value}' already exists."
     };
 
@@ -43,17 +58,17 @@ public sealed record ManagementError
     /// </summary>
     public static ManagementError ValidationFailed(string description, IReadOnlyDictionary<string, string[]>? details = null) => new()
     {
-        Header = "ValidationFailed",
+        Code = "ValidationFailed",
         Description = description,
         Details = details
     };
 
     /// <summary>
-    /// Creates a custom error with the specified header and description.
+    /// Creates a custom error with the specified code and description.
     /// </summary>
-    public static ManagementError Custom(string header, string description) => new()
+    public static ManagementError Custom(string code, string description) => new()
     {
-        Header = header,
+        Code = code,
         Description = description
     };
 }

@@ -11,6 +11,22 @@ namespace OpenIddict.Management.Dashboard.Extensions;
 public static class DashboardEndpointRouteBuilderExtensions
 {
     /// <summary>
+    /// Registers static file handling and dashboard authorization middleware in the ASP.NET Core request pipeline.
+    /// Call this when configuring middleware explicitly on <see cref="IApplicationBuilder"/>.
+    /// </summary>
+    /// <param name="app">The application builder.</param>
+    /// <returns>The <see cref="IApplicationBuilder"/> instance.</returns>
+    public static IApplicationBuilder UseOpenIddictManagementDashboard(this IApplicationBuilder app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        app.UseStaticFiles();
+        app.UseMiddleware<Middleware.DashboardMiddleware>();
+
+        return app;
+    }
+
+    /// <summary>
     /// Maps the OpenIddict Management Dashboard Razor Pages, registers static file handling, and attaches dashboard authorization middleware under the configured route prefix.
     /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
@@ -35,11 +51,10 @@ public static class DashboardEndpointRouteBuilderExtensions
 
         configure?.Invoke(options);
 
-        // Automatically register static files and dashboard protection middleware
+        // Automatically register static files and dashboard protection middleware if endpoints implements IApplicationBuilder (e.g., WebApplication)
         if (endpoints is IApplicationBuilder app)
         {
-            app.UseStaticFiles();
-            app.UseMiddleware<Middleware.DashboardMiddleware>();
+            app.UseOpenIddictManagementDashboard();
         }
 
         endpoints.MapRazorPages();

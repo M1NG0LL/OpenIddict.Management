@@ -46,7 +46,9 @@ public static class OpenIddictManagementEfCoreStoreExtensions
         services.TryAddSingleton(TimeProvider.System);
 
         services.TryAddScoped<IApplicationManagementService, EfCoreApplicationManagementStore<TContext, TKey>>();
+        services.TryAddScoped<ITokenManagementService, EfCoreTokenStore<TContext, TKey>>();
         services.TryAddScoped<IOpenIddictTokenManager, EfCoreTokenStore<TContext, TKey>>();
+        services.TryAddScoped<IAuthorizationManagementService, EfCoreAuthorizationStore<TContext, TKey>>();
         services.TryAddScoped<IOpenIddictAuthorizationManager, EfCoreAuthorizationStore<TContext, TKey>>();
         services.TryAddScoped<IScopeManagementService, EfCoreScopeManagementStore<TContext, TKey>>();
 
@@ -156,7 +158,9 @@ public static class OpenIddictManagementEfCoreStoreExtensions
         services.TryAddSingleton(TimeProvider.System);
 
         services.Replace(ServiceDescriptor.Scoped<IApplicationManagementService, TAppStore>());
+        services.Replace(ServiceDescriptor.Scoped<ITokenManagementService, TTokenStore>());
         services.Replace(ServiceDescriptor.Scoped<IOpenIddictTokenManager, TTokenStore>());
+        services.Replace(ServiceDescriptor.Scoped<IAuthorizationManagementService, TAuthStore>());
         services.Replace(ServiceDescriptor.Scoped<IOpenIddictAuthorizationManager, TAuthStore>());
         services.Replace(ServiceDescriptor.Scoped<IScopeManagementService, TScopeStore>());
 
@@ -180,7 +184,7 @@ public static class OpenIddictManagementEfCoreStoreExtensions
     }
 
     /// <summary>
-    /// Registers or replaces a custom implementation for <see cref="IOpenIddictTokenManager"/>.
+    /// Registers or replaces a custom implementation for <see cref="IOpenIddictTokenManager"/> and <see cref="ITokenManagementService"/>.
     /// </summary>
     /// <typeparam name="TStore">The token manager implementation type.</typeparam>
     /// <param name="services">The service collection.</param>
@@ -192,11 +196,12 @@ public static class OpenIddictManagementEfCoreStoreExtensions
 
         services.TryAddSingleton(TimeProvider.System);
         services.Replace(ServiceDescriptor.Scoped<IOpenIddictTokenManager, TStore>());
+        services.Replace(ServiceDescriptor.Scoped<ITokenManagementService, TStore>());
         return services;
     }
 
     /// <summary>
-    /// Registers or replaces a custom implementation for <see cref="IOpenIddictAuthorizationManager"/>.
+    /// Registers or replaces a custom implementation for <see cref="IOpenIddictAuthorizationManager"/> and <see cref="IAuthorizationManagementService"/>.
     /// </summary>
     /// <typeparam name="TStore">The authorization manager implementation type.</typeparam>
     /// <param name="services">The service collection.</param>
@@ -208,6 +213,7 @@ public static class OpenIddictManagementEfCoreStoreExtensions
 
         services.TryAddSingleton(TimeProvider.System);
         services.Replace(ServiceDescriptor.Scoped<IOpenIddictAuthorizationManager, TStore>());
+        services.Replace(ServiceDescriptor.Scoped<IAuthorizationManagementService, TStore>());
         return services;
     }
 

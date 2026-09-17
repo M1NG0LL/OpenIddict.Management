@@ -35,10 +35,25 @@ public sealed record LoginContext
     /// </summary>
     public string? ClientApplicationId { get; init; }
 
+    private readonly string? _ipAddress;
+
     /// <summary>
     /// Gets the optional IP address of the user initiating login.
     /// </summary>
-    public string? IPAddress { get; init; }
+    public string? IpAddress
+    {
+        get => _ipAddress ?? IPAddress;
+        init => _ipAddress = value;
+    }
+
+    /// <summary>
+    /// Gets the optional IP address of the user initiating login (alias for <see cref="IpAddress"/>).
+    /// </summary>
+    public string? IPAddress
+    {
+        get => _ipAddress;
+        init => _ipAddress = value;
+    }
 
     /// <summary>
     /// Gets the optional User-Agent header of the user initiating login.

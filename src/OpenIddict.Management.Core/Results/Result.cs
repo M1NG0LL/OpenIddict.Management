@@ -51,9 +51,9 @@ public class Result
     public static Result Failure(ManagementError error) => new(false, error);
 
     /// <summary>
-    /// Creates a failed result with the specified header and description.
+    /// Creates a failed result with the specified code/header and description.
     /// </summary>
-    public static Result Failure(string header, string description) => new(false, ManagementError.Custom(header, description));
+    public static Result Failure(string code, string description) => new(false, ManagementError.Custom(code, description));
 
     /// <summary>
     /// Creates a successful typed result with the specified value.
@@ -66,9 +66,50 @@ public class Result
     public static Result<T> Failure<T>(ManagementError error) => Result<T>.Failure(error);
 
     /// <summary>
-    /// Creates a failed typed result with the specified header and description.
+    /// Creates a failed typed result with the specified code/header and description.
     /// </summary>
-    public static Result<T> Failure<T>(string header, string description) => Result<T>.Failure(header, description);
+    public static Result<T> Failure<T>(string code, string description) => Result<T>.Failure(code, description);
+
+    /// <summary>
+    /// Executes the specified action if the operation was successful.
+    /// </summary>
+    public Result Tap(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (IsSuccess)
+        {
+            action();
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Chains another operation returning a <see cref="Result"/> if the current result is successful.
+    /// </summary>
+    public Result Bind(Func<Result> binder)
+    {
+        ArgumentNullException.ThrowIfNull(binder);
+        return IsSuccess ? binder() : this;
+    }
+
+    /// <summary>
+    /// Asynchronously chains another operation returning a <see cref="Result"/> if the current result is successful.
+    /// </summary>
+    public async Task<Result> BindAsync(Func<Task<Result>> binder)
+    {
+        ArgumentNullException.ThrowIfNull(binder);
+        return IsSuccess ? await binder() : this;
+    }
+
+    /// <summary>
+    /// Matches the result and invokes the corresponding function depending on success or failure.
+    /// </summary>
+    public TResult Match<TResult>(Func<TResult> onSuccess, Func<ManagementError, TResult> onFailure)
+    {
+        ArgumentNullException.ThrowIfNull(onSuccess);
+        ArgumentNullException.ThrowIfNull(onFailure);
+        return IsSuccess ? onSuccess() : onFailure(Error!);
+    }
 }
 
 /// <summary>
@@ -90,7 +131,7 @@ public sealed class Result<T> : Result
     /// </summary>
     public T Value => IsSuccess
         ? _value!
-        : throw new InvalidOperationException($"Cannot access {nameof(Value)} on a failed result. Error: [{Error?.Header}] {Error?.Description}");
+        : throw new InvalidOperationException($"Cannot access {nameof(Value)} on a failed result. Error: [{Error?.Code ?? Error?.Header}] {Error?.Description}");
 
     /// <summary>
     /// Gets the value if successful, or default if failed.
@@ -112,9 +153,68 @@ public sealed class Result<T> : Result
     public static new Result<T> Failure(ManagementError error) => new(false, default, error);
 
     /// <summary>
-    /// Creates a failed typed result with the specified header and description.
+    /// Creates a failed typed result with the specified code/header and description.
     /// </summary>
-    public static new Result<T> Failure(string header, string description) => new(false, default, ManagementError.Custom(header, description));
+    public static new Result<T> Failure(string code, string description) => new(false, default, ManagementError.Custom(code, description));
+
+    /// <summary>
+    /// Transforms the value of a successful result using the specified mapping function.
+    /// </summary>
+    public Result<TResult> Map<TResult>(Func<T, TResult> mapper)
+    {
+        ArgumentNullException.ThrowIfNull(mapper);
+        return IsSuccess ? Result<TResult>.Success(mapper(Value)) : Result<TResult>.Failure(Error!);
+    }
+
+    /// <summary>
+    /// Asynchronously transforms the value of a successful result using the specified mapping function.
+    /// </summary>
+    public async Task<Result<TResult>> MapAsync<TResult>(Func<T, Task<TResult>> mapper)
+    {
+        ArgumentNullException.ThrowIfNull(mapper);
+        return IsSuccess ? Result<TResult>.Success(await mapper(Value)) : Result<TResult>.Failure(Error!);
+    }
+
+    /// <summary>
+    /// Chains another operation that returns a <see cref="Result{TResult}"/> if the current result is successful.
+    /// </summary>
+    public Result<TResult> Bind<TResult>(Func<T, Result<TResult>> binder)
+    {
+        ArgumentNullException.ThrowIfNull(binder);
+        return IsSuccess ? binder(Value) : Result<TResult>.Failure(Error!);
+    }
+
+    /// <summary>
+    /// Asynchronously chains another operation that returns a <see cref="Result{TResult}"/> if the current result is successful.
+    /// </summary>
+    public async Task<Result<TResult>> BindAsync<TResult>(Func<T, Task<Result<TResult>>> binder)
+    {
+        ArgumentNullException.ThrowIfNull(binder);
+        return IsSuccess ? await binder(Value) : Result<TResult>.Failure(Error!);
+    }
+
+    /// <summary>
+    /// Executes the specified action if the result is successful.
+    /// </summary>
+    public Result<T> Tap(Action<T> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (IsSuccess)
+        {
+            action(Value);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Matches the result and invokes the corresponding function depending on success or failure.
+    /// </summary>
+    public TResult Match<TResult>(Func<T, TResult> onSuccess, Func<ManagementError, TResult> onFailure)
+    {
+        ArgumentNullException.ThrowIfNull(onSuccess);
+        ArgumentNullException.ThrowIfNull(onFailure);
+        return IsSuccess ? onSuccess(Value) : onFailure(Error!);
+    }
 
     /// <summary>
     /// Implicitly converts a value of type <typeparamref name="T"/> to a successful <see cref="Result{T}"/>.

@@ -6,7 +6,7 @@ namespace OpenIddict.Management.Options;
 public sealed class TokenCleanupOptions
 {
     /// <summary>
-    /// Gets or sets a value indicating whether the token cleanup background job is active. Defaults to <c>true</c>.
+    /// Gets or sets a value indicating whether the token cleanup background job is active. Defaults to <c>false</c>.
     /// </summary>
     public bool IsEnabled { get; set; } = false;
 
@@ -16,7 +16,7 @@ public sealed class TokenCleanupOptions
     public int BatchSize { get; set; } = 100;
 
     /// <summary>
-    /// Gets or sets the execution frequency for the cleanup background job. Defaults to 1 hour.
+    /// Gets or sets the execution frequency for the cleanup background job. Defaults to 24 hours.
     /// </summary>
     public TimeSpan Interval { get; set; } = TimeSpan.FromHours(24);
 

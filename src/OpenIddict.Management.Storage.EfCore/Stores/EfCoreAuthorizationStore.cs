@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OpenIddict.Management.Contracts;
 using OpenIddict.Management.Dto;
 using OpenIddict.Management.Enums;
+using OpenIddict.Management.Events;
 using OpenIddict.Management.Results;
 using OpenIddict.Management.Storage.EfCore.Entities;
 
@@ -14,7 +15,8 @@ namespace OpenIddict.Management.Storage.EfCore.Stores;
 /// <typeparam name="TKey">The primary key type.</typeparam>
 public class EfCoreAuthorizationStore<TContext, TKey>(
     TContext dbContext,
-    TimeProvider timeProvider) : IOpenIddictAuthorizationManager
+    TimeProvider timeProvider,
+    IManagementEventPublisher? eventPublisher = null) : IOpenIddictAuthorizationManager, IAuthorizationManagementService
     where TContext : DbContext
     where TKey : IEquatable<TKey>
 {
@@ -80,10 +82,20 @@ public class EfCoreAuthorizationStore<TContext, TKey>(
 
         var pageIndex = filter.PageIndex < 1 ? 1 : filter.PageIndex;
         var pageSize = filter.PageSize < 1 ? 10 : filter.PageSize;
+        var sortBy = filter.SortBy?.Trim().ToLowerInvariant();
+        query = (sortBy, filter.SortDescending) switch
+        {
+            ("subject", true) => query.OrderByDescending(a => a.Subject).ThenByDescending(a => a.Id),
+            ("subject", false) => query.OrderBy(a => a.Subject).ThenByDescending(a => a.Id),
+            ("clientid", true) => query.OrderByDescending(a => a.Application != null ? a.Application.ClientId : null).ThenByDescending(a => a.Id),
+            ("clientid", false) => query.OrderBy(a => a.Application != null ? a.Application.ClientId : null).ThenByDescending(a => a.Id),
+            ("status", true) => query.OrderByDescending(a => a.Status).ThenByDescending(a => a.Id),
+            ("status", false) => query.OrderBy(a => a.Status).ThenByDescending(a => a.Id),
+            ("creationdate" or "createdat", false) => query.OrderBy(a => a.CreationDate).ThenBy(a => a.Id),
+            _ => query.OrderByDescending(a => a.CreationDate).ThenByDescending(a => a.Id)
+        };
 
         var raw = await query
-            .OrderByDescending(a => a.CreationDate)
-            .ThenByDescending(a => a.Id)
             .Skip((pageIndex - 1) * pageSize)
             .Take(pageSize)
             .Select(a => new
@@ -191,11 +203,124 @@ public class EfCoreAuthorizationStore<TContext, TKey>(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        if (eventPublisher is not null)
+        {
+            await eventPublisher.PublishAsync(new SessionRevokedEvent(authorizationId, userId, tokens.Count), cancellationToken);
+        }
+
         return new RevocationResultDto
         {
             TokensRevoked = tokens.Count,
             AuthorizationsRevoked = activeAuthorizations.Count,
             Scope = RevocationScope.Session
         };
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<SessionDetailsDto>> GetByIdAsync(string id, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return Result.Failure<SessionDetailsDto>("ValidationError", "Authorization ID cannot be empty.");
+        }
+
+        var query = Authorizations
+            .Include(a => a.Application)
+            .Include(a => a.Tokens)
+            .AsNoTracking();
+
+        ManagementAuthorization<TKey>? entity = null;
+        if (typeof(TKey) == typeof(Guid) && Guid.TryParse(id, out var guid))
+        {
+            var key = (TKey)(object)guid;
+            entity = await query.FirstOrDefaultAsync(a => a.Id != null && a.Id.Equals(key), cancellationToken);
+        }
+        else
+        {
+            entity = await query.FirstOrDefaultAsync(a => a.Id != null && a.Id.ToString() == id, cancellationToken);
+        }
+
+        if (entity is null)
+        {
+            return Result.Failure<SessionDetailsDto>(ManagementError.EntityNotFound(nameof(ManagementAuthorization<TKey>), id));
+        }
+
+        var tokens = entity.Tokens.Select(t => new TokenListDto
+        {
+            Id = t.Id != null ? t.Id.ToString()! : string.Empty,
+            ReferenceId = t.ReferenceId,
+            Subject = t.Subject,
+            ClientId = entity.Application?.ClientId,
+            ClientDisplayName = entity.Application?.DisplayName,
+            Type = t.Type,
+            Status = t.Status,
+            CreatedAt = t.CreationDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(t.CreationDate.Value, DateTimeKind.Utc)) : null,
+            ExpirationDate = t.ExpirationDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(t.ExpirationDate.Value, DateTimeKind.Utc)) : null,
+            RevokedAt = t.RevokedAt?.ToUniversalTime(),
+            Payload = t.Payload,
+            Properties = t.Properties
+        }).ToList();
+
+        var dto = new SessionDetailsDto
+        {
+            Id = entity.Id?.ToString() ?? string.Empty,
+            Subject = entity.Subject,
+            ClientId = entity.Application?.ClientId,
+            ClientDisplayName = entity.Application?.DisplayName,
+            Status = entity.Status,
+            Type = entity.Type,
+            Scopes = entity.Scopes,
+            CreatedAt = entity.CreatedAt != default
+                ? entity.CreatedAt.ToUniversalTime()
+                : (entity.CreationDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(entity.CreationDate.Value, DateTimeKind.Utc)) : DateTimeOffset.UtcNow),
+            LastModifiedAt = entity.LastModifiedAt?.ToUniversalTime(),
+            Tokens = tokens
+        };
+
+        return dto;
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<Result> DeleteAsync(string id, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return Result.Failure("ValidationError", "Authorization ID cannot be empty.");
+        }
+
+        ManagementAuthorization<TKey>? entity = null;
+        if (typeof(TKey) == typeof(Guid) && Guid.TryParse(id, out var guid))
+        {
+            var key = (TKey)(object)guid;
+            entity = await Authorizations.FirstOrDefaultAsync(a => a.Id != null && a.Id.Equals(key), cancellationToken);
+        }
+        else
+        {
+            entity = await Authorizations.FirstOrDefaultAsync(a => a.Id != null && a.Id.ToString() == id, cancellationToken);
+        }
+
+        if (entity is null)
+        {
+            return Result.Failure(ManagementError.EntityNotFound(nameof(ManagementAuthorization<TKey>), id));
+        }
+
+        var tokens = await Tokens
+            .Where(t => t.Authorization != null && t.Authorization.Id != null && t.Authorization.Id.Equals(entity.Id))
+            .ToListAsync(cancellationToken);
+
+        if (tokens.Count > 0)
+        {
+            Tokens.RemoveRange(tokens);
+        }
+
+        Authorizations.Remove(entity);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (eventPublisher is not null)
+        {
+            await eventPublisher.PublishAsync(new SessionDeletedEvent(id), cancellationToken);
+        }
+
+        return Result.Success();
     }
 }

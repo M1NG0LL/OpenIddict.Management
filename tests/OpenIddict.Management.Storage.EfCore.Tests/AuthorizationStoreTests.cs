@@ -182,6 +182,71 @@ public class AuthorizationStoreTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task GetByIdAsync_WhenExists_ReturnsSessionDetails()
+    {
+        var authId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var app = new ManagementApplication { Id = appId, ClientId = "client-xyz", DisplayName = "Client XYZ" };
+        await using (var context = new TestDbContext(_options))
+        {
+            context.Applications.Add(app);
+            context.Authorizations.Add(new ManagementAuthorization
+            {
+                Id = authId,
+                Application = app,
+                Subject = "user-1",
+                Status = "valid",
+                Type = "permanent",
+                CreationDate = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = new TestDbContext(_options))
+        {
+            var store = new EfCoreAuthorizationStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var result = await store.GetByIdAsync(authId.ToString());
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.Should().NotBeNull();
+            result.Value!.Id.Should().Be(authId.ToString());
+            result.Value.Subject.Should().Be("user-1");
+            result.Value.ClientDisplayName.Should().Be("Client XYZ");
+        }
+    }
+
+    [Fact]
+    public async Task DeleteAsync_PermanentlyDeletesAuthorization()
+    {
+        var authId = Guid.NewGuid();
+        await using (var context = new TestDbContext(_options))
+        {
+            context.Authorizations.Add(new ManagementAuthorization
+            {
+                Id = authId,
+                Subject = "user-2",
+                Status = "valid",
+                CreationDate = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = new TestDbContext(_options))
+        {
+            var store = new EfCoreAuthorizationStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var result = await store.DeleteAsync(authId.ToString());
+
+            result.IsSuccess.Should().BeTrue();
+        }
+
+        await using (var context = new TestDbContext(_options))
+        {
+            var exists = await context.Authorizations.AnyAsync(a => a.Id == authId);
+            exists.Should().BeFalse();
+        }
+    }
+
     public void Dispose()
     {
         _connection.Dispose();

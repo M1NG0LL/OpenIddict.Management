@@ -25,4 +25,14 @@ public sealed class ManagementEndpointOptions
     /// Gets or sets OpenAPI tags applied to all endpoints. Defaults to ["OpenIddict Management"].
     /// </summary>
     public string[] Tags { get; set; } = ["OpenIddict Management"];
+
+    /// <summary>
+    /// Gets or sets a value indicating whether rate limiting should be enforced on management endpoints. Defaults to false.
+    /// </summary>
+    public bool EnableRateLimiting { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the ASP.NET Core rate limiting policy name. Defaults to "openiddict-management".
+    /// </summary>
+    public string RateLimitingPolicy { get; set; } = "openiddict-management";
 }

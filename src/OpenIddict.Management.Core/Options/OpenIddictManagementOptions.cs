@@ -14,4 +14,9 @@ public sealed class OpenIddictManagementOptions
     /// Gets or sets a value indicating whether endpoints require HTTPS transport security. Defaults to true.
     /// </summary>
     public bool RequireHttps { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether audit logging and event dispatching are enabled. Defaults to true.
+    /// </summary>
+    public bool EnableAuditLogging { get; set; } = true;
 }

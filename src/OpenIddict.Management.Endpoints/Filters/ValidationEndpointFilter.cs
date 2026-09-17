@@ -135,10 +135,6 @@ public sealed class ValidationEndpointFilter : IEndpointFilter
         ValidateUris(dto.RedirectUris, nameof(dto.RedirectUris), errors, "Redirect URI");
         ValidateUris(dto.PostLogoutRedirectUris, nameof(dto.PostLogoutRedirectUris), errors, "Post-logout redirect URI");
 
-        if (!string.IsNullOrWhiteSpace(dto.LogoUri) && !IsValidAbsoluteUri(dto.LogoUri))
-        {
-            AddError(errors, nameof(dto.LogoUri), $"Logo URI '{dto.LogoUri}' is not a valid absolute URI.");
-        }
     }
 
     private static void ValidateApplicationUpdate(ApplicationUpdateDto dto, Dictionary<string, List<string>> errors)
@@ -154,11 +150,6 @@ public sealed class ValidationEndpointFilter : IEndpointFilter
 
         ValidateUris(dto.RedirectUris, nameof(dto.RedirectUris), errors, "Redirect URI");
         ValidateUris(dto.PostLogoutRedirectUris, nameof(dto.PostLogoutRedirectUris), errors, "Post-logout redirect URI");
-
-        if (!string.IsNullOrWhiteSpace(dto.LogoUri) && !IsValidAbsoluteUri(dto.LogoUri))
-        {
-            AddError(errors, nameof(dto.LogoUri), $"Logo URI '{dto.LogoUri}' is not a valid absolute URI.");
-        }
     }
 
     private static void ValidateCreateScope(CreateScopeRequest req, Dictionary<string, List<string>> errors)

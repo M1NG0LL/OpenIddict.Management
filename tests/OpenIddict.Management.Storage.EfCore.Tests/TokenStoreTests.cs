@@ -750,6 +750,58 @@ public class TokenStoreTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task IntrospectTokenAsync_WhenTokenExists_ReturnsIntrospectionDetails()
+    {
+        var tokenId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        var app = new ManagementApplication { Id = appId, ClientId = "client-alpha", DisplayName = "Alpha App" };
+        await using (var context = new TestDbContext(_options))
+        {
+            context.Applications.Add(app);
+            context.Tokens.Add(new ManagementToken
+            {
+                Id = tokenId,
+                Application = app,
+                Subject = "user-alice",
+                Type = "access_token",
+                Status = "valid",
+                CreationDate = now.AddMinutes(-10),
+                ExpirationDate = now.AddMinutes(50),
+                Payload = "{\"scope\":\"api_read api_write\",\"aud\":\"https://api.example.com\"}"
+            });
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = new TestDbContext(_options))
+        {
+            var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
+            var result = await store.IntrospectTokenAsync(tokenId.ToString());
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.Should().NotBeNull();
+            result.Value!.TokenId.Should().Be(tokenId.ToString());
+            result.Value.Active.Should().BeTrue();
+            result.Value.Subject.Should().Be("user-alice");
+            result.Value.ClientId.Should().Be("client-alpha");
+            result.Value.ClientDisplayName.Should().Be("Alpha App");
+            result.Value.Claims.Should().ContainKey("scope");
+            result.Value.Claims["scope"].Should().Be("api_read api_write");
+        }
+    }
+
+    [Fact]
+    public async Task IntrospectTokenAsync_WhenNotFound_ReturnsFailure()
+    {
+        await using var context = new TestDbContext(_options);
+        var store = new EfCoreTokenStore<TestDbContext, Guid>(context, TimeProvider.System);
+        var result = await store.IntrospectTokenAsync(Guid.NewGuid().ToString());
+
+        result.IsSuccess.Should().BeFalse();
+    }
+
     public void Dispose()
     {
         _connection.Dispose();

@@ -5,6 +5,7 @@ using OpenIddict.Management.Constants;
 using OpenIddict.Management.Contracts;
 using OpenIddict.Management.Dto;
 using OpenIddict.Management.Enums;
+using OpenIddict.Management.Events;
 using OpenIddict.Management.Models;
 using OpenIddict.Management.Results;
 using OpenIddict.Management.Storage.EfCore.Entities;
@@ -20,7 +21,8 @@ namespace OpenIddict.Management.Storage.EfCore.Stores;
 public class EfCoreApplicationManagementStore<TContext, TKey>(
     TContext dbContext,
     TimeProvider timeProvider,
-    IOpenIddictApplicationManager? applicationManager = null) : IApplicationManagementService
+    IOpenIddictApplicationManager? applicationManager = null,
+    IManagementEventPublisher? eventPublisher = null) : IApplicationManagementService
     where TContext : DbContext
     where TKey : IEquatable<TKey>
 {
@@ -189,6 +191,12 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
         entity.DefaultScopes = JsonSerializer.Serialize(dto.DefaultScopes);
         entity.Requirements = JsonSerializer.Serialize(dto.Requirements);
 
+        var clientType = dto.ClientType ?? (!string.IsNullOrWhiteSpace(dto.ClientSecret)
+            ? OpenIddictConstants.ClientTypes.Confidential
+            : OpenIddictConstants.ClientTypes.Public);
+
+        entity.ClientType = clientType;
+
         if (!string.IsNullOrWhiteSpace(dto.ClientSecret))
         {
             if (applicationManager is null)
@@ -196,18 +204,22 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
                 throw new InvalidOperationException("IOpenIddictApplicationManager is required to hash and store client secrets securely. Ensure OpenIddict core services are registered in Dependency Injection.");
             }
 
-            entity.ClientType = OpenIddictConstants.ClientTypes.Confidential;
             await applicationManager.CreateAsync(entity, dto.ClientSecret, cancellationToken);
         }
         else
         {
-            entity.ClientType = OpenIddictConstants.ClientTypes.Public;
             entity.ClientSecret = null;
             Applications.Add(entity);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return ApplicationMapper.ToModel(entity);
+        var model = ApplicationMapper.ToModel(entity);
+        if (eventPublisher is not null)
+        {
+            await eventPublisher.PublishAsync(new ApplicationCreatedEvent(model), cancellationToken);
+        }
+
+        return model;
     }
 
     /// <inheritdoc/>
@@ -243,9 +255,20 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
         entity.DefaultScopes = JsonSerializer.Serialize(dto.DefaultScopes);
         entity.Requirements = JsonSerializer.Serialize(dto.Requirements);
 
+        if (!string.IsNullOrWhiteSpace(dto.ClientType))
+        {
+            entity.ClientType = dto.ClientType;
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return ApplicationMapper.ToModel(entity);
+        var model = ApplicationMapper.ToModel(entity);
+        if (eventPublisher is not null)
+        {
+            await eventPublisher.PublishAsync(new ApplicationUpdatedEvent(model), cancellationToken);
+        }
+
+        return model;
     }
 
     /// <inheritdoc/>
@@ -289,6 +312,11 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
             {
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
+        }
+
+        if (eventPublisher is not null)
+        {
+            await eventPublisher.PublishAsync(new ApplicationSecretRotatedEvent(id, entity.ClientId), cancellationToken);
         }
 
         return Result.Success();
@@ -339,6 +367,12 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (eventPublisher is not null)
+        {
+            await eventPublisher.PublishAsync(new ApplicationDeletedEvent(id, entity.ClientId), cancellationToken);
+        }
+
         return Result.Success();
     }
 
@@ -385,6 +419,101 @@ public class EfCoreApplicationManagementStore<TContext, TKey>(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return entities.Count;
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<BulkOperationResultDto>> BulkCreateAsync(
+        IEnumerable<ApplicationCreateDto> dtos,
+        CancellationToken cancellationToken = default)
+    {
+        if (dtos is null)
+        {
+            return Result.Failure<BulkOperationResultDto>("ValidationError", "Applications collection cannot be null.");
+        }
+
+        var successCount = 0;
+        var failureCount = 0;
+        var errors = new List<string>();
+        var processedIds = new List<string>();
+
+        foreach (var dto in dtos)
+        {
+            try
+            {
+                var result = await CreateAsync(dto, cancellationToken);
+                if (result.IsSuccess && result.Value is not null)
+                {
+                    successCount++;
+                    processedIds.Add(result.Value.Id);
+                }
+                else
+                {
+                    failureCount++;
+                    errors.Add($"App '{dto.ClientId}': {result.Error?.Description ?? "Operation failed"}");
+                }
+            }
+            catch (Exception ex)
+            {
+                failureCount++;
+                errors.Add($"App '{dto.ClientId}': {ex.Message}");
+            }
+        }
+
+        return new BulkOperationResultDto
+        {
+            SuccessCount = successCount,
+            FailureCount = failureCount,
+            Errors = errors,
+            ProcessedIds = processedIds
+        };
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<BulkOperationResultDto>> BulkDeleteAsync(
+        IEnumerable<string> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids is null)
+        {
+            return Result.Failure<BulkOperationResultDto>("ValidationError", "Identifiers collection cannot be null.");
+        }
+
+        var successCount = 0;
+        var failureCount = 0;
+        var errors = new List<string>();
+        var processedIds = new List<string>();
+
+        foreach (var id in ids)
+        {
+            if (string.IsNullOrWhiteSpace(id)) continue;
+            try
+            {
+                var result = await DeleteAsync(id, hardDelete: false, cancellationToken);
+                if (result.IsSuccess)
+                {
+                    successCount++;
+                    processedIds.Add(id);
+                }
+                else
+                {
+                    failureCount++;
+                    errors.Add($"App '{id}': {result.Error?.Description ?? "Operation failed"}");
+                }
+            }
+            catch (Exception ex)
+            {
+                failureCount++;
+                errors.Add($"App '{id}': {ex.Message}");
+            }
+        }
+
+        return new BulkOperationResultDto
+        {
+            SuccessCount = successCount,
+            FailureCount = failureCount,
+            Errors = errors,
+            ProcessedIds = processedIds
+        };
     }
 
     /// <summary>

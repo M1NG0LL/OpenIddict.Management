@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using OpenIddict.Management.Builder;
 using OpenIddict.Management.Contracts;
+using OpenIddict.Management.Events;
 using OpenIddict.Management.Models;
 using OpenIddict.Management.Options;
 using OpenIddict.Management.Services;
@@ -30,8 +31,27 @@ public static class OpenIddictManagementServiceExtensions
         services.TryAddScoped<IOpenIddictLoginEngine<LoginContext>, OpenIddictLoginEngine>();
         services.TryAddScoped<IOpenIddictTokenService, OpenIddictTokenService>();
 
+        services.TryAddSingleton<IAuditTrailStore, InMemoryAuditTrailStore>();
+        services.TryAddScoped<IManagementEventPublisher, OpenIddict.Management.Events.ManagementEventPublisher>();
+        services.TryAddScoped<IConfigurationExportImportService, ConfigurationExportImportService>();
+
+        // Register default audit trail handler for domain events
+        services.TryAddScoped<OpenIddict.Management.Events.AuditTrailEventHandler>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.ApplicationCreatedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.ApplicationUpdatedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.ApplicationDeletedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.ApplicationSecretRotatedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.ScopeCreatedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.ScopeUpdatedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.ScopeDeletedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.TokenRevokedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.TokensRevokedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.TokensPrunedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.SessionRevokedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<OpenIddict.Management.Events.IManagementEventHandler<OpenIddict.Management.Events.SessionDeletedEvent>, OpenIddict.Management.Events.AuditTrailEventHandler>());
+
         services.TryAddSingleton<ITokenCleanupJobManager, TokenCleanupJobManager>();
-        services.AddHostedService<TokenCleanupBackgroundService>();
+        AddTokenCleanupHostedService(services);
 
         var optionsBuilder = services.AddOptions<OpenIddictManagementOptions>();
         if (configure is not null)
@@ -60,8 +80,16 @@ public static class OpenIddictManagementServiceExtensions
         }
 
         services.TryAddSingleton<ITokenCleanupJobManager, TokenCleanupJobManager>();
-        services.AddHostedService<TokenCleanupBackgroundService>();
+        AddTokenCleanupHostedService(services);
 
         return services;
+    }
+
+    private static void AddTokenCleanupHostedService(IServiceCollection services)
+    {
+        if (!services.Any(d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService) && d.ImplementationType == typeof(TokenCleanupBackgroundService)))
+        {
+            services.AddHostedService<TokenCleanupBackgroundService>();
+        }
     }
 }

@@ -38,14 +38,9 @@ public sealed record ApplicationCreateDto
     public string? Description { get; init; }
 
     /// <summary>
-    /// Gets the logo URI for the application.
+    /// Gets the client type (confidential or public). Defaults to confidential if null.
     /// </summary>
-    public string? LogoUri { get; init; }
-
-    /// <summary>
-    /// Gets the owner user ID.
-    /// </summary>
-    public string? OwnerUserId { get; init; }
+    public string? ClientType { get; init; }
 
     /// <summary>
     /// Gets the allowed redirect URIs.

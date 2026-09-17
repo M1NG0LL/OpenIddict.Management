@@ -34,7 +34,15 @@ public interface IScopeManagementService
     Task<Result<PagedResult<ManagedScope>>> ListAsync(PagedRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Creates a new OpenID Connect scope.
+    /// Creates a new OpenID Connect scope from a request model.
+    /// </summary>
+    /// <param name="request">The scope creation details.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A <see cref="Result{T}"/> containing the created <see cref="ManagedScope"/>.</returns>
+    Task<Result<ManagedScope>> CreateAsync(CreateScopeRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a new OpenID Connect scope with explicit parameters.
     /// </summary>
     /// <param name="name">The unique scope name.</param>
     /// <param name="displayName">The scope display name.</param>
@@ -50,7 +58,16 @@ public interface IScopeManagementService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Updates an existing OpenID Connect scope.
+    /// Updates an existing OpenID Connect scope from a request model.
+    /// </summary>
+    /// <param name="id">The scope unique identifier.</param>
+    /// <param name="request">The updated scope details.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A <see cref="Result{T}"/> containing the updated <see cref="ManagedScope"/>.</returns>
+    Task<Result<ManagedScope>> UpdateAsync(string id, UpdateScopeRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates an existing OpenID Connect scope with explicit parameters.
     /// </summary>
     /// <param name="id">The scope unique identifier.</param>
     /// <param name="displayName">The updated display name.</param>
@@ -72,4 +89,20 @@ public interface IScopeManagementService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A <see cref="Result"/> indicating success or failure.</returns>
     Task<Result> DeleteAsync(string id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates multiple OpenID Connect scopes in a batch operation.
+    /// </summary>
+    /// <param name="requests">The collection of scope creation requests.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A <see cref="Result{T}"/> containing a <see cref="BulkOperationResultDto"/>.</returns>
+    Task<Result<BulkOperationResultDto>> BulkCreateAsync(IEnumerable<CreateScopeRequest> requests, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes multiple OpenID Connect scopes in a batch operation.
+    /// </summary>
+    /// <param name="ids">The collection of scope identifiers to delete.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A <see cref="Result{T}"/> containing a <see cref="BulkOperationResultDto"/>.</returns>
+    Task<Result<BulkOperationResultDto>> BulkDeleteAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default);
 }

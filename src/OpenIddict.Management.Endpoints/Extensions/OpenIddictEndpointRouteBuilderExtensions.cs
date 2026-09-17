@@ -27,6 +27,12 @@ public static class OpenIddictEndpointRouteBuilderExtensions
         ArgumentNullException.ThrowIfNull(endpoints);
 
         var options = new ManagementEndpointOptions();
+        var coreOptions = endpoints.ServiceProvider.GetService<IOptions<OpenIddict.Management.Options.OpenIddictManagementOptions>>()?.Value;
+        if (coreOptions is not null && !string.IsNullOrWhiteSpace(coreOptions.RoutePrefix))
+        {
+            options.RoutePrefix = coreOptions.RoutePrefix;
+        }
+
         var registeredOptions = endpoints.ServiceProvider.GetService<IOptions<ManagementEndpointOptions>>()?.Value;
         if (registeredOptions is not null)
         {
@@ -34,6 +40,8 @@ public static class OpenIddictEndpointRouteBuilderExtensions
             options.AuthorizationPolicy = registeredOptions.AuthorizationPolicy;
             options.RequireAuthorization = registeredOptions.RequireAuthorization;
             options.Tags = registeredOptions.Tags;
+            options.EnableRateLimiting = registeredOptions.EnableRateLimiting;
+            options.RateLimitingPolicy = registeredOptions.RateLimitingPolicy;
         }
 
         configure?.Invoke(options);
@@ -61,6 +69,14 @@ public static class OpenIddictEndpointRouteBuilderExtensions
             }
         }
 
+        if (options.EnableRateLimiting)
+        {
+            var policy = !string.IsNullOrWhiteSpace(options.RateLimitingPolicy)
+                ? options.RateLimitingPolicy
+                : "openiddict-management";
+            group.RequireRateLimiting(policy);
+        }
+
         // Map endpoint sub-groups
         group.MapApplicationEndpoints();
         group.MapTokenEndpoints();
@@ -69,6 +85,8 @@ public static class OpenIddictEndpointRouteBuilderExtensions
         group.MapSessionEndpoints();
         group.MapOverviewEndpoints();
         group.MapCleanupEndpoints();
+        group.MapAuditEndpoints();
+        group.MapConfigurationEndpoints();
 
         return group;
     }

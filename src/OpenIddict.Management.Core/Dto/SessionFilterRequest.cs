@@ -22,4 +22,16 @@ public sealed record SessionFilterRequest
 
     /// <summary>Gets or sets authorization status filter (all, active/valid, revoked).</summary>
     public string? Status { get; init; }
+
+    /// <summary>Gets or sets optional sort field name (e.g. "CreationDate", "Subject", "ClientId", "Status").</summary>
+    public string? SortBy { get; init; }
+
+    /// <summary>Gets or sets a value indicating whether to sort descending. Defaults to true.</summary>
+    public bool SortDescending { get; init; } = true;
+
+    /// <summary>
+    /// Returns a copy of the request configured with the specified sort parameters.
+    /// </summary>
+    public SessionFilterRequest WithSort(string sortBy, bool sortDescending = false) =>
+        this with { SortBy = sortBy, SortDescending = sortDescending };
 }

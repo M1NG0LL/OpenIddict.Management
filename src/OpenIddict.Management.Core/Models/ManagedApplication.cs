@@ -43,14 +43,9 @@ public sealed record ManagedApplication
     public string? Description { get; init; }
 
     /// <summary>
-    /// Gets the logo URI for the application.
+    /// Gets the client type (confidential or public).
     /// </summary>
-    public string? LogoUri { get; init; }
-
-    /// <summary>
-    /// Gets the user ID of the application owner.
-    /// </summary>
-    public string? OwnerUserId { get; init; }
+    public string? ClientType { get; init; }
 
     /// <summary>
     /// Gets the UTC timestamp when the application was created.
@@ -104,7 +99,7 @@ public sealed record ManagedApplication
     /// <returns>True if the application contains the tag; otherwise, false.</returns>
     public bool HasTag(string tag)
     {
-        if (string.IsNullOrWhiteSpace(tag) || Tags is null or { Count: 0 })
+        if (string.IsNullOrWhiteSpace(tag) || Tags.Count == 0)
         {
             return false;
         }

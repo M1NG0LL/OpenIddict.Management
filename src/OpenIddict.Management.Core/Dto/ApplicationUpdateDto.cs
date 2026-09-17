@@ -33,14 +33,9 @@ public sealed record ApplicationUpdateDto
     public string? Description { get; init; }
 
     /// <summary>
-    /// Gets the updated logo URI for the application.
+    /// Gets the updated client type (confidential or public), if specified.
     /// </summary>
-    public string? LogoUri { get; init; }
-
-    /// <summary>
-    /// Gets the updated owner user ID.
-    /// </summary>
-    public string? OwnerUserId { get; init; }
+    public string? ClientType { get; init; }
 
     /// <summary>
     /// Gets the updated allowed redirect URIs.

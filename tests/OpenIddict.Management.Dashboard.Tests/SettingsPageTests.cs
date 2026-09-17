@@ -8,7 +8,9 @@ using NSubstitute;
 using OpenIddict.Abstractions;
 using OpenIddict.Management.Contracts;
 using OpenIddict.Management.Dashboard.Pages.Settings;
+using OpenIddict.Management.Dto;
 using OpenIddict.Management.Options;
+using OpenIddict.Management.Results;
 using OpenIddict.Server;
 using Xunit;
 
@@ -324,5 +326,132 @@ public class SettingsPageTests
 
         model.IsSuccess.Should().BeFalse();
         model.Message.Should().Contain("not registered");
+    }
+
+    [Fact]
+    public async Task OnPostExportJsonAsync_WhenServiceAvailable_ReturnsFileResult()
+    {
+        var exportService = Substitute.For<IConfigurationExportImportService>();
+        exportService.ExportConfigurationAsJsonAsync(Arg.Any<CancellationToken>())
+            .Returns(Result<string>.Success("{\"version\":\"1.0\"}"));
+
+        var model = new IndexModel(exportImportService: exportService)
+        {
+            PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), Substitute.For<ITempDataProvider>())
+        };
+
+        var result = await model.OnPostExportJsonAsync();
+
+        result.Should().BeOfType<FileContentResult>();
+        var fileResult = (FileContentResult)result;
+        fileResult.ContentType.Should().Be("application/json");
+        fileResult.FileDownloadName.Should().StartWith("openiddict-configuration-").And.EndWith(".json");
+        System.Text.Encoding.UTF8.GetString(fileResult.FileContents).Should().Be("{\"version\":\"1.0\"}");
+    }
+
+    [Fact]
+    public async Task OnPostExportJsonAsync_WhenServiceUnavailable_RedirectsWithError()
+    {
+        var model = new IndexModel(exportImportService: null)
+        {
+            PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), Substitute.For<ITempDataProvider>())
+        };
+
+        var result = await model.OnPostExportJsonAsync();
+
+        result.Should().BeOfType<RedirectToPageResult>();
+        var redirect = (RedirectToPageResult)result;
+        redirect.RouteValues!["activeTab"].Should().Be("export-import");
+        model.IsSuccess.Should().BeFalse();
+        model.Message.Should().Contain("not registered");
+    }
+
+    [Fact]
+    public async Task OnPostImportJsonAsync_WithValidJsonText_ImportsAndRedirectsWithSuccess()
+    {
+        var exportService = Substitute.For<IConfigurationExportImportService>();
+        exportService.ImportConfigurationFromJsonAsync(Arg.Any<string>(), Arg.Any<ImportOptions?>(), Arg.Any<CancellationToken>())
+            .Returns(Result<ImportResultDto>.Success(new ImportResultDto
+            {
+                ApplicationsCreated = 2,
+                ScopesCreated = 1,
+                OpenIddictServerConfigImported = true,
+                ManagementConfigImported = true
+            }));
+
+        var model = new IndexModel(exportImportService: exportService)
+        {
+            PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), Substitute.For<ITempDataProvider>())
+        };
+
+        var result = await model.OnPostImportJsonAsync(
+            importFile: null,
+            importJsonText: "{\"version\":\"1.0\"}",
+            overwriteExisting: true,
+            importApplications: true,
+            importScopes: true,
+            importConfigurations: true);
+
+        result.Should().BeOfType<RedirectToPageResult>();
+        var redirect = (RedirectToPageResult)result;
+        redirect.RouteValues!["activeTab"].Should().Be("export-import");
+        model.IsSuccess.Should().BeTrue();
+        model.Message.Should().Contain("Import completed").And.Contain("Apps: +2").And.Contain("Scopes: +1");
+    }
+
+    [Fact]
+    public async Task OnPostImportJsonAsync_WithUploadedFile_ImportsAndRedirects()
+    {
+        var exportService = Substitute.For<IConfigurationExportImportService>();
+        exportService.ImportConfigurationFromJsonAsync(Arg.Any<string>(), Arg.Any<ImportOptions?>(), Arg.Any<CancellationToken>())
+            .Returns(Result<ImportResultDto>.Success(new ImportResultDto
+            {
+                ApplicationsCreated = 1
+            }));
+
+        var model = new IndexModel(exportImportService: exportService)
+        {
+            PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), Substitute.For<ITempDataProvider>())
+        };
+
+        var jsonBytes = System.Text.Encoding.UTF8.GetBytes("{\"version\":\"1.0\"}");
+        var stream = new MemoryStream(jsonBytes);
+        IFormFile formFile = new FormFile(stream, 0, jsonBytes.Length, "importFile", "backup.json")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/json"
+        };
+
+        var result = await model.OnPostImportJsonAsync(
+            importFile: formFile,
+            importJsonText: null);
+
+        result.Should().BeOfType<RedirectToPageResult>();
+        model.IsSuccess.Should().BeTrue();
+        model.Message.Should().Contain("Import completed");
+    }
+
+    [Fact]
+    public async Task OnPostImportJsonAsync_WhenNoInputProvided_RedirectsWithError()
+    {
+        var exportService = Substitute.For<IConfigurationExportImportService>();
+
+        var model = new IndexModel(exportImportService: exportService)
+        {
+            PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
+            TempData = new TempDataDictionary(new DefaultHttpContext(), Substitute.For<ITempDataProvider>())
+        };
+
+        var result = await model.OnPostImportJsonAsync(
+            importFile: null,
+            importJsonText: "   ");
+
+        result.Should().BeOfType<RedirectToPageResult>();
+        model.IsSuccess.Should().BeFalse();
+        model.Message.Should().Contain("Please select a JSON file");
     }
 }

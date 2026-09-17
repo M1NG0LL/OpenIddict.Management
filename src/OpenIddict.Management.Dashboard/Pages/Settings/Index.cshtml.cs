@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
@@ -18,11 +19,22 @@ public class IndexModel(
     IOptions<DashboardOptions>? dashboardOptions = null,
     IOptionsMonitor<OpenIddictServerOptions>? serverOptionsMonitor = null,
     IOptions<OpenIddictServerOptions>? serverOptions = null,
-    IScopeManagementService? scopeService = null) : PageModel
+    IScopeManagementService? scopeService = null,
+    IConfigurationExportImportService? exportImportService = null,
+    IApplicationManagementService? applicationService = null) : PageModel
 {
-    /// <summary>Gets or sets the active settings tab ("general", "oidc", "tokens").</summary>
+    /// <summary>Gets or sets the active settings tab ("general", "oidc", "tokens", "export-import").</summary>
     [BindProperty(SupportsGet = true)]
     public string ActiveTab { get; set; } = "general";
+
+    /// <summary>Gets whether the configuration export/import service is available.</summary>
+    public bool IsExportImportAvailable => exportImportService is not null;
+
+    /// <summary>Gets the total registered applications count.</summary>
+    public int TotalApplicationsCount { get; set; }
+
+    /// <summary>Gets the total registered scopes count.</summary>
+    public int TotalScopesCount { get; set; }
 
     // --- Token Cleanup Background Job Properties ---
 
@@ -373,12 +385,22 @@ public class IndexModel(
             SelectedResponseModes = opt.ResponseModes.ToList();
         }
 
+        if (applicationService is not null)
+        {
+            var appResult = await applicationService.ListAsync(new PagedRequest { PageIndex = 1, PageSize = 1 }, cancellationToken: cancellationToken);
+            if (appResult.IsSuccess && appResult.Value is not null)
+            {
+                TotalApplicationsCount = appResult.Value.TotalCount;
+            }
+        }
+
         if (scopeService is not null)
         {
             var scopeResult = await scopeService.ListAsync(new PagedRequest { PageIndex = 1, PageSize = 1000 }, cancellationToken);
             if (scopeResult.IsSuccess && scopeResult.Value is not null)
             {
                 DatabaseScopes = scopeResult.Value.Items;
+                TotalScopesCount = scopeResult.Value.TotalCount;
             }
         }
     }
@@ -674,6 +696,101 @@ public class IndexModel(
         Message = "OpenIddict server configuration updated successfully. Changes are active immediately.";
 
         return RedirectToPage(new { activeTab = "oidc" });
+    }
+
+    /// <summary>Handles POST requests to export the system configuration package as a downloadable JSON file.</summary>
+    public async Task<IActionResult> OnPostExportJsonAsync(CancellationToken cancellationToken = default)
+    {
+        if (exportImportService is null)
+        {
+            Message = "Configuration export/import service is not registered in the application.";
+            IsSuccess = false;
+            return RedirectToPage(new { activeTab = "export-import" });
+        }
+
+        var result = await exportImportService.ExportConfigurationAsJsonAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            Message = $"Export failed: {result.Error?.Description ?? "Unknown error"}";
+            IsSuccess = false;
+            return RedirectToPage(new { activeTab = "export-import" });
+        }
+
+        var fileName = $"openiddict-configuration-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}.json";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(result.Value!);
+        return File(bytes, "application/json", fileName);
+    }
+
+    /// <summary>Handles GET requests to download the exported JSON file directly via a link.</summary>
+    public async Task<IActionResult> OnGetExportJsonAsync(CancellationToken cancellationToken = default)
+    {
+        return await OnPostExportJsonAsync(cancellationToken);
+    }
+
+    /// <summary>Handles POST requests to import a configuration package from an uploaded JSON file or raw JSON text.</summary>
+    public async Task<IActionResult> OnPostImportJsonAsync(
+        IFormFile? importFile,
+        string? importJsonText,
+        bool overwriteExisting = false,
+        bool importApplications = true,
+        bool importScopes = true,
+        bool importConfigurations = true,
+        CancellationToken cancellationToken = default)
+    {
+        if (exportImportService is null)
+        {
+            Message = "Configuration export/import service is not registered in the application.";
+            IsSuccess = false;
+            return RedirectToPage(new { activeTab = "export-import" });
+        }
+
+        string json;
+        if (importFile is not null && importFile.Length > 0)
+        {
+            using var reader = new StreamReader(importFile.OpenReadStream());
+            json = await reader.ReadToEndAsync(cancellationToken);
+        }
+        else if (!string.IsNullOrWhiteSpace(importJsonText))
+        {
+            json = importJsonText;
+        }
+        else
+        {
+            Message = "Please select a JSON file to upload or paste valid configuration JSON text.";
+            IsSuccess = false;
+            return RedirectToPage(new { activeTab = "export-import" });
+        }
+
+        var options = new ImportOptions
+        {
+            OverwriteExisting = overwriteExisting,
+            ImportApplications = importApplications,
+            ImportScopes = importScopes,
+            ImportConfigurations = importConfigurations
+        };
+
+        var result = await exportImportService.ImportConfigurationFromJsonAsync(json, options, cancellationToken);
+        if (result.IsFailure)
+        {
+            Message = $"Import failed: {result.Error?.Description ?? "Invalid export package"}";
+            IsSuccess = false;
+            return RedirectToPage(new { activeTab = "export-import" });
+        }
+
+        var res = result.Value!;
+        var summary = $"Import completed. Apps: +{res.ApplicationsCreated} updated:{res.ApplicationsUpdated} skipped:{res.ApplicationsSkipped} | Scopes: +{res.ScopesCreated} updated:{res.ScopesUpdated} skipped:{res.ScopesSkipped}";
+        if (options.ImportConfigurations)
+        {
+            summary += $" | Server Config: {(res.OpenIddictServerConfigImported ? "Applied" : "Skipped")} | Mgmt Config: {(res.ManagementConfigImported ? "Applied" : "Skipped")}";
+        }
+        if (res.Errors.Count > 0)
+        {
+            summary += $" (Warnings: {string.Join("; ", res.Errors)})";
+        }
+
+        Message = summary;
+        IsSuccess = res.Errors.Count == 0;
+        return RedirectToPage(new { activeTab = "export-import" });
     }
 
     /// <summary>Resolves a relative or absolute path against issuer or current HTTP request.</summary>

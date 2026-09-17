@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using OpenIddict.Management.Exceptions;
 using OpenIddict.Management.Results;
 using HttpResults = Microsoft.AspNetCore.Http.Results;
@@ -8,7 +9,7 @@ namespace OpenIddict.Management.Endpoints.Filters;
 /// <summary>
 /// Minimal API endpoint filter that catches unhandled domain exceptions and maps them to HTTP responses.
 /// </summary>
-public sealed class ExceptionMappingEndpointFilter : IEndpointFilter
+public sealed class ExceptionMappingEndpointFilter(ILogger<ExceptionMappingEndpointFilter>? logger = null) : IEndpointFilter
 {
     /// <inheritdoc/>
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
@@ -40,6 +41,17 @@ public sealed class ExceptionMappingEndpointFilter : IEndpointFilter
         catch (ManagementException ex)
         {
             return HttpResults.BadRequest(ManagementError.Custom("ManagementError", ex.Message));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "An unhandled exception occurred while processing the management endpoint request.");
+            return HttpResults.Json(
+                ManagementError.Custom("InternalServerError", "An unexpected error occurred while processing the request."),
+                statusCode: StatusCodes.Status500InternalServerError);
         }
     }
 }

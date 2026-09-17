@@ -1,7 +1,9 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using OpenIddict.Management.Contracts;
 using OpenIddict.Management.Dto;
 using OpenIddict.Management.Enums;
+using OpenIddict.Management.Events;
 using OpenIddict.Management.Results;
 using OpenIddict.Management.Storage.EfCore.Entities;
 
@@ -14,7 +16,8 @@ namespace OpenIddict.Management.Storage.EfCore.Stores;
 /// <typeparam name="TKey">The primary key type.</typeparam>
 public class EfCoreTokenStore<TContext, TKey>(
     TContext dbContext,
-    TimeProvider timeProvider) : IOpenIddictTokenManager
+    TimeProvider timeProvider,
+    IManagementEventPublisher? eventPublisher = null) : IOpenIddictTokenManager, ITokenManagementService
     where TContext : DbContext
     where TKey : IEquatable<TKey>
 {
@@ -49,9 +52,24 @@ public class EfCoreTokenStore<TContext, TKey>(
         var pageIndex = filter.PageIndex < 1 ? 1 : filter.PageIndex;
         var pageSize = filter.PageSize < 1 ? 10 : filter.PageSize;
 
+        var sortBy = filter.SortBy?.Trim().ToLowerInvariant();
+        query = (sortBy, filter.SortDescending) switch
+        {
+            ("expirationdate", true) => query.OrderByDescending(t => t.ExpirationDate).ThenByDescending(t => t.Id),
+            ("expirationdate", false) => query.OrderBy(t => t.ExpirationDate).ThenByDescending(t => t.Id),
+            ("subject", true) => query.OrderByDescending(t => t.Subject).ThenByDescending(t => t.Id),
+            ("subject", false) => query.OrderBy(t => t.Subject).ThenByDescending(t => t.Id),
+            ("clientid", true) => query.OrderByDescending(t => t.Application != null ? t.Application.ClientId : null).ThenByDescending(t => t.Id),
+            ("clientid", false) => query.OrderBy(t => t.Application != null ? t.Application.ClientId : null).ThenByDescending(t => t.Id),
+            ("type", true) => query.OrderByDescending(t => t.Type).ThenByDescending(t => t.Id),
+            ("type", false) => query.OrderBy(t => t.Type).ThenByDescending(t => t.Id),
+            ("status", true) => query.OrderByDescending(t => t.Status).ThenByDescending(t => t.Id),
+            ("status", false) => query.OrderBy(t => t.Status).ThenByDescending(t => t.Id),
+            ("creationdate" or "createdat", false) => query.OrderBy(t => t.CreationDate).ThenBy(t => t.Id),
+            _ => query.OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id)
+        };
+
         var tokens = await query
-            .OrderByDescending(t => t.CreationDate)
-            .ThenByDescending(t => t.Id)
             .Skip((pageIndex - 1) * pageSize)
             .Take(pageSize)
             .Select(t => new
@@ -79,7 +97,6 @@ public class EfCoreTokenStore<TContext, TKey>(
             ClientId = t.ClientId,
             ClientDisplayName = t.ClientDisplayName,
             Type = t.Type,
-            CreationDate = t.CreationDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(t.CreationDate.Value, DateTimeKind.Utc)) : null,
             CreatedAt = t.CreationDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(t.CreationDate.Value, DateTimeKind.Utc)) : null,
             ExpirationDate = t.ExpirationDate.HasValue
                 ? new DateTimeOffset(DateTime.SpecifyKind(t.ExpirationDate.Value, DateTimeKind.Utc))
@@ -243,6 +260,11 @@ public class EfCoreTokenStore<TContext, TKey>(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        if (eventPublisher is not null)
+        {
+            await eventPublisher.PublishAsync(new TokenRevokedEvent(tokenId, token.Subject, token.Application?.ClientId), cancellationToken);
+        }
+
         return new RevocationResultDto
         {
             TokensRevoked = 1,
@@ -281,6 +303,11 @@ public class EfCoreTokenStore<TContext, TKey>(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (eventPublisher is not null)
+        {
+            await eventPublisher.PublishAsync(new TokensRevokedEvent(tokens.Count, Scope: "User"), cancellationToken);
+        }
 
         return new RevocationResultDto
         {
@@ -450,6 +477,11 @@ public class EfCoreTokenStore<TContext, TKey>(
         Tokens.RemoveRange(tokensToDelete);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        if (eventPublisher is not null && tokensToDelete.Count > 0)
+        {
+            await eventPublisher.PublishAsync(new TokensPrunedEvent(tokensToDelete.Count), cancellationToken);
+        }
+
         return tokensToDelete.Count;
     }
 
@@ -594,8 +626,166 @@ public class EfCoreTokenStore<TContext, TKey>(
                 .ToListAsync(cancellationToken);
         }
 
-        var idStrings = distinctIds.ToHashSet();
-        var all = await Tokens.ToListAsync(cancellationToken);
-        return all.Where(t => t.Id != null && idStrings.Contains(t.Id.ToString()!)).ToList();
+        var converter = System.ComponentModel.TypeDescriptor.GetConverter(typeof(TKey));
+        var convertedKeys = new List<TKey>();
+        foreach (var id in distinctIds)
+        {
+            try
+            {
+                if (converter.CanConvertFrom(typeof(string)))
+                {
+                    var converted = (TKey?)converter.ConvertFromString(id);
+                    if (converted is not null)
+                    {
+                        convertedKeys.Add(converted);
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore unconvertible IDs
+            }
+        }
+
+        if (convertedKeys.Count == 0)
+        {
+            return [];
+        }
+
+        return await Tokens
+            .Where(t => t.Id != null && convertedKeys.Contains(t.Id))
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<TokenIntrospectionDto>> IntrospectTokenAsync(
+        string idOrReferenceId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(idOrReferenceId))
+        {
+            return Result.Failure<TokenIntrospectionDto>("ValidationError", "Token identifier cannot be empty.");
+        }
+
+        var trimmed = idOrReferenceId.Trim();
+        var query = Tokens.Include(t => t.Application).Include(t => t.Authorization).AsNoTracking();
+
+        ManagementToken<TKey>? entity = null;
+        if (typeof(TKey) == typeof(Guid) && Guid.TryParse(trimmed, out var guid))
+        {
+            var key = (TKey)(object)guid;
+            entity = await query.FirstOrDefaultAsync(t => (t.Id != null && t.Id.Equals(key)) || t.ReferenceId == trimmed, cancellationToken);
+        }
+        else
+        {
+            entity = await query.FirstOrDefaultAsync(t => (t.Id != null && t.Id.ToString() == trimmed) || t.ReferenceId == trimmed, cancellationToken);
+        }
+
+        if (entity is null)
+        {
+            return Result.Failure<TokenIntrospectionDto>(ManagementError.EntityNotFound(nameof(ManagementToken<TKey>), trimmed));
+        }
+
+        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var isRevoked = entity.Status == "revoked" || entity.RevokedAt != null;
+        var isExpired = entity.ExpirationDate != null && entity.ExpirationDate <= nowUtc;
+        var isActive = !isRevoked && !isExpired;
+
+        var claims = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var scopes = new List<string>();
+
+        if (entity.Authorization != null && !string.IsNullOrWhiteSpace(entity.Authorization.Scopes))
+        {
+            try
+            {
+                var parsedScopes = JsonSerializer.Deserialize<List<string>>(entity.Authorization.Scopes);
+                if (parsedScopes is not null) scopes.AddRange(parsedScopes);
+            }
+            catch
+            {
+                scopes.AddRange(entity.Authorization.Scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(entity.Payload))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(entity.Payload);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var prop in doc.RootElement.EnumerateObject())
+                    {
+                        if (prop.Value.ValueKind == JsonValueKind.Array && prop.NameEquals("scope"))
+                        {
+                            foreach (var s in prop.Value.EnumerateArray())
+                            {
+                                var val = s.GetString();
+                                if (!string.IsNullOrWhiteSpace(val) && !scopes.Contains(val))
+                                {
+                                    scopes.Add(val);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            claims[prop.Name] = prop.Value.ToString();
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                claims["payload_format"] = "encrypted_or_opaque";
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(entity.Properties))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(entity.Properties);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var prop in doc.RootElement.EnumerateObject())
+                    {
+                        claims[$"prop:{prop.Name}"] = prop.Value.ToString();
+                    }
+                }
+            }
+            catch
+            {
+                claims["properties_raw"] = entity.Properties;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(entity.Subject) && !claims.ContainsKey("sub"))
+        {
+            claims["sub"] = entity.Subject;
+        }
+
+        if (entity.Application?.ClientId is not null && !claims.ContainsKey("client_id"))
+        {
+            claims["client_id"] = entity.Application.ClientId;
+        }
+
+        var dto = new TokenIntrospectionDto
+        {
+            Active = isActive,
+            TokenId = entity.Id?.ToString() ?? string.Empty,
+            ReferenceId = entity.ReferenceId,
+            TokenType = entity.Type,
+            Subject = entity.Subject,
+            ClientId = entity.Application?.ClientId,
+            ClientDisplayName = entity.Application?.DisplayName,
+            IssuedAt = entity.CreationDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(entity.CreationDate.Value, DateTimeKind.Utc)) : null,
+            ExpiresAt = entity.ExpirationDate.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(entity.ExpirationDate.Value, DateTimeKind.Utc)) : null,
+            RevokedAt = entity.RevokedAt?.ToUniversalTime(),
+            Status = isRevoked ? "revoked" : (isExpired ? "expired" : "valid"),
+            Scopes = scopes.Distinct().ToList(),
+            Claims = claims
+        };
+
+        return dto;
     }
 }

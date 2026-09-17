@@ -33,9 +33,9 @@ public sealed record ApplicationListDto
     public ApplicationEnvironment Environment { get; init; }
 
     /// <summary>
-    /// Gets the owner user ID.
+    /// Gets the client type (confidential or public).
     /// </summary>
-    public string? OwnerUserId { get; init; }
+    public string? ClientType { get; init; }
 
     /// <summary>
     /// Gets the list of tags assigned to the application.

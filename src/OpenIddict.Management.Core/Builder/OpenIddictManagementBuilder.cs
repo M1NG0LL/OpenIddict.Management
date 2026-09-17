@@ -103,7 +103,10 @@ public sealed class OpenIddictManagementBuilder(IServiceCollection services)
         }
 
         Services.TryAddSingleton<ITokenCleanupJobManager, TokenCleanupJobManager>();
-        Services.AddHostedService<TokenCleanupBackgroundService>();
+        if (!Services.Any(d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService) && d.ImplementationType == typeof(TokenCleanupBackgroundService)))
+        {
+            Services.AddHostedService<TokenCleanupBackgroundService>();
+        }
         return this;
     }
 

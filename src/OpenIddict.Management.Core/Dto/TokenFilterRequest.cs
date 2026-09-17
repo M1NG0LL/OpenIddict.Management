@@ -11,8 +11,21 @@ public sealed record TokenFilterRequest
     /// <summary>Gets or sets requested page size.</summary>
     public int PageSize { get; init; } = 10;
 
+    private readonly string? _search;
+
     /// <summary>Gets or sets optional search term across token ID, reference ID, client ID, or user ID.</summary>
-    public string? SearchTerm { get; init; }
+    public string? Search
+    {
+        get => _search ?? SearchTerm;
+        init => _search = value;
+    }
+
+    /// <summary>Gets or sets optional search term across token ID, reference ID, client ID, or user ID (alias for <see cref="Search"/>).</summary>
+    public string? SearchTerm
+    {
+        get => _search;
+        init => _search = value;
+    }
 
     /// <summary>Gets or sets user/subject filter.</summary>
     public string? UserId { get; init; }
@@ -45,4 +58,16 @@ public sealed record TokenFilterRequest
 
     /// <summary>Gets or sets token type filter (e.g. access_token, refresh_token).</summary>
     public string? TokenType { get; init; }
+
+    /// <summary>Gets or sets optional sort field name (e.g. "CreationDate", "ExpirationDate", "Subject", "ClientId", "Type", "Status").</summary>
+    public string? SortBy { get; init; }
+
+    /// <summary>Gets or sets a value indicating whether to sort descending. Defaults to true for token timelines.</summary>
+    public bool SortDescending { get; init; } = true;
+
+    /// <summary>
+    /// Returns a copy of the request configured with the specified sort parameters.
+    /// </summary>
+    public TokenFilterRequest WithSort(string sortBy, bool sortDescending = false) =>
+        this with { SortBy = sortBy, SortDescending = sortDescending };
 }
