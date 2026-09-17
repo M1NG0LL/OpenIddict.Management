@@ -203,9 +203,10 @@ app.MapOpenIddictManagementEndpoints(options =>
 | `POST` | `/` | `CreateApplication` | Create → 201 |
 | `PUT` | `/{id}` | `UpdateApplication` | Update → 200 or 404 |
 | `DELETE` | `/{id}?hard=false` | `DeleteApplication` | Soft/hard delete → 204 or 404 |
-| `PATCH` | `/{id}/status?status=Active` | `UpdateApplicationStatus` | Update status → 204 or 404 |
 | `POST` | `/{id}/secret` | `UpdateClientSecret` | Update client secret |
 | `POST` | `/bulk-status` | `BulkUpdateApplicationStatus` | Bulk update status by environment |
+| `POST` | `/bulk-create` | `BulkCreateApplications` | Batch create multiple applications |
+| `POST` | `/bulk-delete` | `BulkDeleteApplications` | Batch delete applications by ID |
 
 ### Scope Endpoints (`/api/management/scopes`)
 
@@ -217,6 +218,21 @@ app.MapOpenIddictManagementEndpoints(options =>
 | `POST` | `/` | `CreateScope` | Create → 201 |
 | `PUT` | `/{id}` | `UpdateScope` | Update |
 | `DELETE` | `/{id}` | `DeleteScope` | Delete → 204 |
+| `POST` | `/bulk-create` | `BulkCreateScopes` | Batch create multiple scopes |
+| `POST` | `/bulk-delete` | `BulkDeleteScopes` | Batch delete scopes by ID |
+
+### Configuration Endpoints (`/api/management/configuration`)
+
+| Method | Route | Name | Description |
+|---|---|---|---|
+| `GET` | `/export` | `ExportConfiguration` | Export full configuration package (`ManagementExportPackage` with dynamic `VersionPrefix`) |
+| `POST` | `/import` | `ImportConfiguration` | Import and apply configuration with options (`overwrite`, `importApplications`, `importScopes`, `importConfigurations`) |
+
+### Audit Trail Endpoints (`/api/management/audit`)
+
+| Method | Route | Name | Description |
+|---|---|---|---|
+| `GET` | `/` | `ListAuditLogs` | Paginated audit entries (category, action, actor, success, dates). *(Requires `EnableAuditLogging = true`)* |
 
 ### Token Endpoints (`/api/management/tokens`)
 
@@ -301,6 +317,8 @@ app.MapOpenIddictManagementDashboard();
 | **Scopes** | `/{prefix}/Scopes` | Paginated scope list |
 | **Scope Edit** | `/{prefix}/Scopes/Edit/{id}` | Edit scope |
 | **Token Inspector** | `/{prefix}/Tokens` | Token listing with filters, revocation, bulk actions |
+| **Audit Trail** | `/{prefix}/Audit` | Real-time audit log of administrative and security events |
+| **Settings** | `/{prefix}/Settings` | Configuration export/import, token cleanup scheduling, audit status |
 
 ### Dashboard Middleware
 
