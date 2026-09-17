@@ -1,3 +1,4 @@
+using System.Reflection;
 using OpenIddict.Management.Enums;
 
 namespace OpenIddict.Management.Dto;
@@ -255,8 +256,11 @@ public sealed record OpenIddictServerConfigurationDto
 /// </summary>
 public sealed record ManagementExportPackage
 {
+    /// <summary>Gets the default version prefix derived from the assembly metadata.</summary>
+    public static string VersionPrefix { get; } = ResolveVersionPrefix();
+
     /// <summary>Gets the schema version of the export package.</summary>
-    public string Version { get; init; } = "1.0";
+    public string Version { get; init; } = VersionPrefix;
 
     /// <summary>Gets the UTC timestamp when the package was exported.</summary>
     public DateTimeOffset ExportedAt { get; init; } = DateTimeOffset.UtcNow;
@@ -272,6 +276,30 @@ public sealed record ManagementExportPackage
 
     /// <summary>Gets the exported OpenIddict Management suite configuration, if available.</summary>
     public OpenIddictManagementConfigurationDto? Management { get; init; }
+
+    private static string ResolveVersionPrefix()
+    {
+        var assembly = typeof(ManagementExportPackage).Assembly;
+        var informationalVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(informationalVersion))
+        {
+            var prefix = informationalVersion.Split(['-', '+'])[0].Trim();
+            if (!string.IsNullOrWhiteSpace(prefix))
+            {
+                return prefix;
+            }
+        }
+
+        var version = assembly.GetName().Version;
+        if (version is not null)
+        {
+            return version.Build >= 0
+                ? $"{version.Major}.{version.Minor}.{version.Build}"
+                : $"{version.Major}.{version.Minor}.0";
+        }
+
+        return "1.0.0";
+    }
 }
 
 /// <summary>

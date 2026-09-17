@@ -179,7 +179,7 @@ public sealed class ConfigurationExportImportService(
 
         var package = new ManagementExportPackage
         {
-            Version = "1.0",
+            Version = ManagementExportPackage.VersionPrefix,
             ExportedAt = DateTimeOffset.UtcNow,
             Applications = exportedApps,
             Scopes = exportedScopes,

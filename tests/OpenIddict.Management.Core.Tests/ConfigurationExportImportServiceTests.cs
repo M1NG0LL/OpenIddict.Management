@@ -53,7 +53,9 @@ public class ConfigurationExportImportServiceTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
-        result.Value!.Applications.Should().ContainSingle();
+        result.Value!.Version.Should().Be(ManagementExportPackage.VersionPrefix);
+        result.Value.Version.Should().Be("1.1.0");
+        result.Value.Applications.Should().ContainSingle();
         result.Value.Applications[0].ClientId.Should().Be("app-1");
         result.Value.Applications[0].ClientType.Should().Be("confidential");
         result.Value.Scopes.Should().ContainSingle();
@@ -376,5 +378,13 @@ public class ConfigurationExportImportServiceTests
         targetServer.RequireProofKeyForCodeExchange.Should().BeTrue();
         targetServer.GrantTypes.Should().Contain("authorization_code");
         targetManagement.RoutePrefix.Should().Be("/api/v1/mgmt");
+    }
+
+    [Fact]
+    public void ManagementExportPackage_VersionPrefix_ResolvesFromAssemblyMetadata()
+    {
+        ManagementExportPackage.VersionPrefix.Should().Be("1.1.0");
+        var package = new ManagementExportPackage();
+        package.Version.Should().Be("1.1.0");
     }
 }
