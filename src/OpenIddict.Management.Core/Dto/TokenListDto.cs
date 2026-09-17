@@ -31,14 +31,14 @@ public sealed record TokenListDto
     private readonly DateTimeOffset? _revokedAt;
 
     /// <summary>Gets the UTC timestamp when the token was created.</summary>
-    public DateTimeOffset? CreationDate
+    public DateTimeOffset? CreatedAt
     {
         get => _createdAt;
         init => _createdAt = value?.ToUniversalTime();
     }
 
-    /// <summary>Gets the UTC timestamp when the token was created (alias for CreationDate).</summary>
-    public DateTimeOffset? CreatedAt
+    /// <summary>Gets the UTC timestamp when the token was created (alias for CreatedAt).</summary>
+    public DateTimeOffset? CreationDate
     {
         get => _createdAt;
         init => _createdAt = value?.ToUniversalTime();
@@ -70,6 +70,16 @@ public sealed record TokenListDto
     /// <summary>Gets whether the token has been revoked.</summary>
     public bool IsRevoked => string.Equals(Status, "revoked", StringComparison.OrdinalIgnoreCase) || RevokedAt.HasValue;
 
-    /// <summary>Gets whether the token has expired.</summary>
-    public bool IsExpired => ExpirationDate.HasValue && ExpirationDate.Value.UtcDateTime < DateTime.UtcNow;
+    /// <summary>Gets whether the token has expired relative to the current UTC time.</summary>
+    public bool IsExpired => IsExpiredAt(DateTimeOffset.UtcNow);
+
+    /// <summary>Determines whether the token has expired relative to the provided <see cref="TimeProvider"/>.</summary>
+    public bool IsExpiredAt(TimeProvider timeProvider)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        return IsExpiredAt(timeProvider.GetUtcNow());
+    }
+
+    /// <summary>Determines whether the token has expired relative to the provided point in time.</summary>
+    public bool IsExpiredAt(DateTimeOffset now) => ExpirationDate.HasValue && ExpirationDate.Value < now;
 }

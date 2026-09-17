@@ -135,7 +135,7 @@ internal static class ApplicationEndpointsGroup
         .WithName("UpdateClientSecret")
         .WithSummary("Update application client secret")
         .WithDescription("Updates the client secret for the specified application.")
-        .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status204NoContent)
         .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status404NotFound);
 
@@ -151,6 +151,34 @@ internal static class ApplicationEndpointsGroup
         .WithSummary("Bulk update application operational status")
         .WithDescription("Updates the operational status (Active, Disabled, Deleted) for all applications within a specified environment, or across all environments if not specified.")
         .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status400BadRequest);
+
+        appGroup.MapPost("/bulk-create", async (
+            [FromBody] IEnumerable<ApplicationCreateDto> dtos,
+            [FromServices] IApplicationManagementService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.BulkCreateAsync(dtos, cancellationToken);
+            return result.ToHttpResult();
+        })
+        .WithName("BulkCreateApplications")
+        .WithSummary("Bulk create applications")
+        .WithDescription("Registers multiple OpenID Connect applications in a single batch operation.")
+        .Produces<BulkOperationResultDto>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status400BadRequest);
+
+        appGroup.MapPost("/bulk-delete", async (
+            [FromBody] IEnumerable<string> ids,
+            [FromServices] IApplicationManagementService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.BulkDeleteAsync(ids, cancellationToken);
+            return result.ToHttpResult();
+        })
+        .WithName("BulkDeleteApplications")
+        .WithSummary("Bulk delete applications")
+        .WithDescription("Deletes multiple OpenID Connect applications by their identifiers in a single batch operation.")
+        .Produces<BulkOperationResultDto>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status400BadRequest);
 
         return appGroup;

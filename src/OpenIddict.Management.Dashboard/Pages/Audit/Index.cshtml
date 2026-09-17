@@ -1,0 +1,191 @@
+@page
+@model OpenIddict.Management.Dashboard.Pages.Audit.IndexModel
+@{
+    ViewData["Title"] = "Audit Trail";
+    var prefix = DashboardOptions.Value.PathPrefix.TrimEnd('/');
+
+    string GetActionBadgeClass(string action) => action?.ToLowerInvariant() switch
+    {
+        "created" => "badge-success",
+        "updated" => "badge-primary",
+        "deleted" => "badge-danger",
+        "revoked" => "badge-danger",
+        "pruned" => "badge-warning",
+        "rotatedsecret" => "badge-warning",
+        _ => "badge-secondary"
+    };
+
+    string GetCategoryBadgeClass(string category) => category?.ToLowerInvariant() switch
+    {
+        "application" => "badge-primary",
+        "scope" => "badge-info",
+        "token" => "badge-warning",
+        "authorization" => "badge-secondary",
+        "job" => "badge-light",
+        _ => "badge-secondary"
+    };
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Audit Trail</h1>
+        <p class="page-subtitle">Track, inspect, and review administrative operations, security events, and configuration lifecycle changes.</p>
+    </div>
+</div>
+
+@if (!Model.IsAuditLoggingEnabled)
+{
+    <div class="alert alert-warning" style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <div>
+            <strong>Audit Logging is Disabled:</strong> Audit trail recording is currently turned off in configuration (<code>OpenIddictManagementOptions.EnableAuditLogging = false</code>). New operations are not being recorded.
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <form method="get" class="filter-bar" style="margin-bottom: 0; display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                <div style="flex: 2; min-width: 200px;">
+                    <input type="text" name="SearchTerm" class="form-control" placeholder="Search by entity, actor, details..." value="@Model.SearchTerm" />
+                </div>
+                <div style="flex: 1; min-width: 140px;">
+                    <select name="Category" class="form-control">
+                        <option value="">All Categories</option>
+                        <option value="Application" selected="@(Model.Category == "Application")">Application</option>
+                        <option value="Scope" selected="@(Model.Category == "Scope")">Scope</option>
+                        <option value="Token" selected="@(Model.Category == "Token")">Token</option>
+                        <option value="Authorization" selected="@(Model.Category == "Authorization")">Authorization</option>
+                        <option value="Job" selected="@(Model.Category == "Job")">Job</option>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 140px;">
+                    <select name="ActionFilter" class="form-control">
+                        <option value="">All Actions</option>
+                        <option value="Created" selected="@(Model.ActionFilter == "Created")">Created</option>
+                        <option value="Updated" selected="@(Model.ActionFilter == "Updated")">Updated</option>
+                        <option value="Deleted" selected="@(Model.ActionFilter == "Deleted")">Deleted</option>
+                        <option value="Revoked" selected="@(Model.ActionFilter == "Revoked")">Revoked</option>
+                        <option value="RotatedSecret" selected="@(Model.ActionFilter == "RotatedSecret")">RotatedSecret</option>
+                        <option value="Pruned" selected="@(Model.ActionFilter == "Pruned")">Pruned</option>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 130px;">
+                    <select name="SuccessOnly" class="form-control">
+                        <option value="">All Outcomes</option>
+                        <option value="true" selected="@(Model.SuccessOnly == true)">Success Only</option>
+                        <option value="false" selected="@(Model.SuccessOnly == false)">Failed Only</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Filter</button>
+                <a href="@prefix/Audit" class="btn btn-secondary">Reset</a>
+            </form>
+        </div>
+
+        @if (Model.Entries.Items.Count == 0)
+        {
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                <div class="empty-state-title">No audit records found</div>
+                <div class="empty-state-description">No management operations match the selected criteria or no actions have been logged yet.</div>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Category</th>
+                            <th>Action</th>
+                            <th>Entity</th>
+                            <th>Actor</th>
+                            <th>Outcome</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in Model.Entries.Items)
+                        {
+                            <tr>
+                                <td style="white-space: nowrap; font-family: monospace; font-size: 0.85rem;">
+                                    @entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss") UTC
+                                </td>
+                                <td>
+                                    <span class="badge @GetCategoryBadgeClass(entry.Category)">@entry.Category</span>
+                                </td>
+                                <td>
+                                    <span class="badge @GetActionBadgeClass(entry.Action)">@entry.Action</span>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>@(entry.EntityName ?? entry.EntityId ?? "—")</strong>
+                                        @if (!string.IsNullOrEmpty(entry.EntityId) && entry.EntityId != entry.EntityName)
+                                        {
+                                            <div style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">@entry.EntityId</div>
+                                        }
+                                    </div>
+                                </td>
+                                <td>@(entry.Actor ?? "System")</td>
+                                <td>
+                                    @if (entry.Success)
+                                    {
+                                        <span class="badge badge-success">Success</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-danger" title="@entry.ErrorMessage">Failed</span>
+                                    }
+                                </td>
+                                <td style="max-width: 320px; font-size: 0.85rem;">
+                                    @if (!string.IsNullOrEmpty(entry.ErrorMessage))
+                                    {
+                                        <div style="color: var(--danger, #ef4444);">@entry.ErrorMessage</div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(entry.Details))
+                                    {
+                                        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="@entry.Details">
+                                            @entry.Details
+                                        </div>
+                                    }
+                                    @if (string.IsNullOrEmpty(entry.ErrorMessage) && string.IsNullOrEmpty(entry.Details))
+                                    {
+                                        <span style="color: var(--text-muted);">—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-top: 1px solid var(--border-color);">
+                <div style="font-size: 0.875rem; color: var(--text-muted);">
+                    Showing @(Math.Min(Model.Entries.TotalCount, (Model.Entries.PageIndex - 1) * Model.Entries.PageSize + 1)) - @(Math.Min(Model.Entries.TotalCount, Model.Entries.PageIndex * Model.Entries.PageSize)) of @Model.Entries.TotalCount records
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    @if (Model.Entries.HasPreviousPage)
+                    {
+                        <a href="?PageNumber=@(Model.Entries.PageIndex - 1)&PageSize=@Model.Entries.PageSize&SearchTerm=@Model.SearchTerm&Category=@Model.Category&ActionFilter=@Model.ActionFilter&SuccessOnly=@Model.SuccessOnly" class="btn btn-secondary btn-sm">Previous</a>
+                    }
+                    @if (Model.Entries.HasNextPage)
+                    {
+                        <a href="?PageNumber=@(Model.Entries.PageIndex + 1)&PageSize=@Model.Entries.PageSize&SearchTerm=@Model.SearchTerm&Category=@Model.Category&ActionFilter=@Model.ActionFilter&SuccessOnly=@Model.SuccessOnly" class="btn btn-secondary btn-sm">Next</a>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OpenIddict.Management.Constants;
 using OpenIddict.Management.Contracts;
 using OpenIddict.Management.Dto;
+using OpenIddict.Management.Events;
 using OpenIddict.Management.Models;
 using OpenIddict.Management.Results;
 using OpenIddict.Management.Storage.EfCore.Entities;
@@ -17,7 +18,8 @@ namespace OpenIddict.Management.Storage.EfCore.Stores;
 /// <typeparam name="TKey">The primary key type.</typeparam>
 public class EfCoreScopeManagementStore<TContext, TKey>(
     TContext dbContext,
-    TimeProvider timeProvider) : IScopeManagementService
+    TimeProvider timeProvider,
+    IManagementEventPublisher? eventPublisher = null) : IScopeManagementService
     where TContext : DbContext
     where TKey : IEquatable<TKey>
 {
@@ -108,6 +110,13 @@ public class EfCoreScopeManagementStore<TContext, TKey>(
     }
 
     /// <inheritdoc/>
+    public virtual Task<Result<ManagedScope>> CreateAsync(CreateScopeRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return CreateAsync(request.Name, request.DisplayName, request.Description, request.Resources, cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public virtual async Task<Result<ManagedScope>> CreateAsync(
         string name,
         string? displayName,
@@ -141,7 +150,20 @@ public class EfCoreScopeManagementStore<TContext, TKey>(
         Scopes.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return ScopeMapper.ToModel(entity);
+        var model = ScopeMapper.ToModel(entity);
+        if (eventPublisher is not null)
+        {
+            await eventPublisher.PublishAsync(new ScopeCreatedEvent(model), cancellationToken);
+        }
+
+        return model;
+    }
+
+    /// <inheritdoc/>
+    public virtual Task<Result<ManagedScope>> UpdateAsync(string id, UpdateScopeRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return UpdateAsync(id, request.DisplayName, request.Description, request.Resources, cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -175,7 +197,13 @@ public class EfCoreScopeManagementStore<TContext, TKey>(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return ScopeMapper.ToModel(entity);
+        var model = ScopeMapper.ToModel(entity);
+        if (eventPublisher is not null)
+        {
+            await eventPublisher.PublishAsync(new ScopeUpdatedEvent(model), cancellationToken);
+        }
+
+        return model;
     }
 
     /// <inheritdoc/>
@@ -194,7 +222,108 @@ public class EfCoreScopeManagementStore<TContext, TKey>(
 
         Scopes.Remove(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (eventPublisher is not null)
+        {
+            await eventPublisher.PublishAsync(new ScopeDeletedEvent(id, entity.Name), cancellationToken);
+        }
+
         return Result.Success();
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<BulkOperationResultDto>> BulkCreateAsync(
+        IEnumerable<CreateScopeRequest> requests,
+        CancellationToken cancellationToken = default)
+    {
+        if (requests is null)
+        {
+            return Result.Failure<BulkOperationResultDto>("ValidationError", "Scope requests collection cannot be null.");
+        }
+
+        var successCount = 0;
+        var failureCount = 0;
+        var errors = new List<string>();
+        var processedIds = new List<string>();
+
+        foreach (var req in requests)
+        {
+            try
+            {
+                var result = await CreateAsync(req, cancellationToken);
+                if (result.IsSuccess && result.Value is not null)
+                {
+                    successCount++;
+                    processedIds.Add(result.Value.Id);
+                }
+                else
+                {
+                    failureCount++;
+                    errors.Add($"Scope '{req.Name}': {result.Error?.Description ?? "Operation failed"}");
+                }
+            }
+            catch (Exception ex)
+            {
+                failureCount++;
+                errors.Add($"Scope '{req.Name}': {ex.Message}");
+            }
+        }
+
+        return new BulkOperationResultDto
+        {
+            SuccessCount = successCount,
+            FailureCount = failureCount,
+            Errors = errors,
+            ProcessedIds = processedIds
+        };
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<BulkOperationResultDto>> BulkDeleteAsync(
+        IEnumerable<string> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids is null)
+        {
+            return Result.Failure<BulkOperationResultDto>("ValidationError", "Identifiers collection cannot be null.");
+        }
+
+        var successCount = 0;
+        var failureCount = 0;
+        var errors = new List<string>();
+        var processedIds = new List<string>();
+
+        foreach (var id in ids)
+        {
+            if (string.IsNullOrWhiteSpace(id)) continue;
+            try
+            {
+                var result = await DeleteAsync(id, cancellationToken);
+                if (result.IsSuccess)
+                {
+                    successCount++;
+                    processedIds.Add(id);
+                }
+                else
+                {
+                    failureCount++;
+                    errors.Add($"Scope '{id}': {result.Error?.Description ?? "Operation failed"}");
+                }
+            }
+            catch (Exception ex)
+            {
+                failureCount++;
+                errors.Add($"Scope '{id}': {ex.Message}");
+            }
+        }
+
+        return new BulkOperationResultDto
+        {
+            SuccessCount = successCount,
+            FailureCount = failureCount,
+            Errors = errors,
+            ProcessedIds = processedIds
+        };
     }
 
     /// <summary>

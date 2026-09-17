@@ -83,10 +83,25 @@ public sealed record LoginResult
     /// </summary>
     public Func<Claim, IEnumerable<string>?>? DestinationSelector { get; init; }
 
+    private readonly string? _errorCode;
+
     /// <summary>
-    /// Gets the error header or code if login failed.
+    /// Gets the error code if login failed.
     /// </summary>
-    public string? ErrorHeader { get; init; }
+    public string? ErrorCode
+    {
+        get => _errorCode ?? ErrorHeader;
+        init => _errorCode = value;
+    }
+
+    /// <summary>
+    /// Gets the error header or code if login failed (alias for <see cref="ErrorCode"/>).
+    /// </summary>
+    public string? ErrorHeader
+    {
+        get => _errorCode;
+        init => _errorCode = value;
+    }
 
     /// <summary>
     /// Gets the detailed error message if login failed.

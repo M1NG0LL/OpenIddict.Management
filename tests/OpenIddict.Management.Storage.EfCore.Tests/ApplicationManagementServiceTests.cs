@@ -442,8 +442,6 @@ public class ApplicationManagementServiceTests : IDisposable
             DisplayName = "Initial Name",
             Environment = ApplicationEnvironment.Development,
             Description = "Initial Description",
-            LogoUri = "https://example.com/initial.png",
-            OwnerUserId = "user-1",
             AllowedRoles = ["Reader"]
         })).Value;
 
@@ -453,8 +451,6 @@ public class ApplicationManagementServiceTests : IDisposable
             Environment = ApplicationEnvironment.Production,
             Status = ApplicationStatus.Active,
             Description = "Updated Description",
-            LogoUri = "https://example.com/updated.png",
-            OwnerUserId = "user-2",
             ExtraData = "{\"version\":2}",
             Tags = ["Production", "Core"],
             AllowedRoles = ["Admin", "SuperUser"],
@@ -473,8 +469,6 @@ public class ApplicationManagementServiceTests : IDisposable
         updated.DisplayName.Should().Be("Updated Name");
         updated.Environment.Should().Be(ApplicationEnvironment.Production);
         updated.Description.Should().Be("Updated Description");
-        updated.LogoUri.Should().Be("https://example.com/updated.png");
-        updated.OwnerUserId.Should().Be("user-2");
         updated.ExtraData.Should().Be("{\"version\":2}");
         updated.Tags.Should().BeEquivalentTo(["Production", "Core"]);
         updated.AllowedRoles.Should().BeEquivalentTo(["Admin", "SuperUser"]);
@@ -653,7 +647,6 @@ public class ApplicationManagementServiceTests : IDisposable
             {
                 ClientId = $"client-sort-{i:D2}",
                 DisplayName = $"App {i:D2}",
-                OwnerUserId = $"owner-{i}",
                 Environment = i % 2 == 0 ? ApplicationEnvironment.Production : ApplicationEnvironment.Development
             });
         }
@@ -840,6 +833,52 @@ public class ApplicationManagementServiceTests : IDisposable
         // Assert: Application is completely removed
         var appCount = await context.Applications.Where(a => a.ClientId == "cascade-delete-client").CountAsync();
         appCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task CreateAsync_PersistsAndReturns_ClientType()
+    {
+        var (service, _, _) = CreateServiceWithDi();
+
+        var createResult = await service.CreateAsync(new ApplicationCreateDto
+        {
+            ClientId = "public-spa",
+            DisplayName = "Public SPA App",
+            ClientType = "public"
+        });
+
+        createResult.IsSuccess.Should().BeTrue();
+        createResult.Value.ClientType.Should().Be("public");
+
+        var getResult = await service.GetByIdAsync(createResult.Value.Id);
+        getResult.IsSuccess.Should().BeTrue();
+        getResult.Value.ClientType.Should().Be("public");
+    }
+
+    [Fact]
+    public async Task BulkCreateAsync_And_BulkDeleteAsync_Applications_Succeeds()
+    {
+        var (service, _, _) = CreateServiceWithDi();
+
+        var bulkCreate = await service.BulkCreateAsync([
+            new ApplicationCreateDto { ClientId = "bulk-app-1", DisplayName = "Bulk App 1" },
+            new ApplicationCreateDto { ClientId = "bulk-app-2", DisplayName = "Bulk App 2" }
+        ]);
+
+        bulkCreate.IsSuccess.Should().BeTrue();
+        bulkCreate.Value.SuccessCount.Should().Be(2);
+
+        var list = await service.ListAsync(new PagedRequest { PageSize = 10 });
+        list.Value.TotalCount.Should().Be(2);
+
+        var ids = list.Value.Items.Select(x => x.Id).ToList();
+        var bulkDelete = await service.BulkDeleteAsync(ids);
+
+        bulkDelete.IsSuccess.Should().BeTrue();
+        bulkDelete.Value.SuccessCount.Should().Be(2);
+
+        var listAfter = await service.ListAsync(new PagedRequest { PageSize = 10 });
+        listAfter.Value.TotalCount.Should().Be(0);
     }
 
     private (IApplicationManagementService Service, OpenIddict.Abstractions.IOpenIddictApplicationManager AppManager, ServiceProvider Provider) CreateServiceWithDi()

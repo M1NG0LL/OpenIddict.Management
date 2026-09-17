@@ -119,6 +119,79 @@ public class ScopeManagementStoreTests : IDisposable
         listResult.Value.Items.Should().HaveCount(2);
     }
 
+    [Fact]
+    public async Task CreateAsync_WithDto_ReturnsSuccess()
+    {
+        await using var context = new ScopeTestDbContext(_options);
+        var service = new EfCoreScopeManagementStore<ScopeTestDbContext, Guid>(context, TimeProvider.System);
+
+        var request = new CreateScopeRequest
+        {
+            Name = "api_dto",
+            DisplayName = "API DTO Scope",
+            Description = "Created with DTO",
+            Resources = ["rs_dto"]
+        };
+
+        var result = await service.CreateAsync(request);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Name.Should().Be("api_dto");
+        result.Value.DisplayName.Should().Be("API DTO Scope");
+        result.Value.Resources.Should().Contain("rs_dto");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithDto_ReturnsSuccess()
+    {
+        await using var context = new ScopeTestDbContext(_options);
+        var service = new EfCoreScopeManagementStore<ScopeTestDbContext, Guid>(context, TimeProvider.System);
+
+        var created = await service.CreateAsync(new CreateScopeRequest { Name = "scope_to_update" });
+        created.IsSuccess.Should().BeTrue();
+
+        var updateRequest = new UpdateScopeRequest
+        {
+            DisplayName = "Updated Display Name",
+            Description = "Updated Description",
+            Resources = ["res1", "res2"]
+        };
+
+        var updateResult = await service.UpdateAsync(created.Value.Id, updateRequest);
+
+        updateResult.IsSuccess.Should().BeTrue();
+        updateResult.Value.DisplayName.Should().Be("Updated Display Name");
+        updateResult.Value.Description.Should().Be("Updated Description");
+        updateResult.Value.Resources.Should().Contain("res1");
+    }
+
+    [Fact]
+    public async Task BulkCreateAsync_And_BulkDeleteAsync_Succeeds()
+    {
+        await using var context = new ScopeTestDbContext(_options);
+        var service = new EfCoreScopeManagementStore<ScopeTestDbContext, Guid>(context, TimeProvider.System);
+
+        var bulkCreate = await service.BulkCreateAsync([
+            new CreateScopeRequest { Name = "bulk_1", DisplayName = "Bulk 1" },
+            new CreateScopeRequest { Name = "bulk_2", DisplayName = "Bulk 2" }
+        ]);
+
+        bulkCreate.IsSuccess.Should().BeTrue();
+        bulkCreate.Value.SuccessCount.Should().Be(2);
+
+        var list = await service.ListAsync(new PagedRequest { PageSize = 10 });
+        list.Value.TotalCount.Should().Be(2);
+
+        var ids = list.Value.Items.Select(x => x.Id).ToList();
+        var bulkDelete = await service.BulkDeleteAsync(ids);
+
+        bulkDelete.IsSuccess.Should().BeTrue();
+        bulkDelete.Value.SuccessCount.Should().Be(2);
+
+        var listAfter = await service.ListAsync(new PagedRequest { PageSize = 10 });
+        listAfter.Value.TotalCount.Should().Be(0);
+    }
+
     public void Dispose()
     {
         _connection.Dispose();

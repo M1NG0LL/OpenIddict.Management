@@ -94,4 +94,20 @@ public interface IApplicationManagementService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A <see cref="Result{T}"/> containing the count of updated applications.</returns>
     Task<Result<int>> SetStatusByEnvironmentAsync(ApplicationEnvironment? environment, ApplicationStatus status, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates multiple applications in a batch operation.
+    /// </summary>
+    /// <param name="dtos">The collection of application creation DTOs.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A <see cref="Result{T}"/> containing a <see cref="BulkOperationResultDto"/>.</returns>
+    Task<Result<BulkOperationResultDto>> BulkCreateAsync(IEnumerable<ApplicationCreateDto> dtos, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes multiple applications in a batch operation.
+    /// </summary>
+    /// <param name="ids">The collection of application identifiers to delete.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A <see cref="Result{T}"/> containing a <see cref="BulkOperationResultDto"/>.</returns>
+    Task<Result<BulkOperationResultDto>> BulkDeleteAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default);
 }

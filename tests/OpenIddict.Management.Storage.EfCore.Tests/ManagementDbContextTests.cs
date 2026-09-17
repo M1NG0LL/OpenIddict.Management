@@ -44,7 +44,6 @@ public class ManagementDbContextTests : IDisposable
                 DisplayName = "Test Client",
                 Status = ApplicationStatus.Active,
                 Environment = ApplicationEnvironment.Development,
-                OwnerUserId = "user-123",
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
@@ -62,7 +61,6 @@ public class ManagementDbContextTests : IDisposable
             app!.ClientId.Should().Be("test-client");
             app.Status.Should().Be(ApplicationStatus.Active);
             app.Environment.Should().Be(ApplicationEnvironment.Development);
-            app.OwnerUserId.Should().Be("user-123");
 
             var roles = app.GetAllowedRoles();
             roles.Should().BeEquivalentTo(["Admin", "User"]);

@@ -7,7 +7,7 @@
 
 `OpenIddict.Management.Storage.EfCore` (`Mingoll.OpenIddict.Management.Storage.EfCore`) delivers complete Entity Framework Core persistence implementations for the OpenIddict Management ecosystem.
 
-Install this package when using EF Core (SQL Server, PostgreSQL, SQLite, MySQL) as your backing database. It provides out-of-the-box management store implementations (`EfCoreApplicationManagementStore`, `EfCoreTokenStore`, `EfCoreAuthorizationStore`, `EfCoreScopeManagementStore`), enhanced entity types with auditing and metadata properties, and fluent `ModelBuilder` extensions.
+Install this package when using EF Core (SQL Server, PostgreSQL, SQLite, MySQL) as your backing database. It provides out-of-the-box management store implementations (`EfCoreApplicationManagementStore`, `EfCoreTokenStore`, `EfCoreAuthorizationStore`, `EfCoreScopeManagementStore`), enhanced entity types with auditing and metadata properties, batch/bulk operation execution, client secret rotation, and fluent `ModelBuilder` extensions.
 
 ---
 
@@ -35,7 +35,7 @@ Install-Package Mingoll.OpenIddict.Management.Storage.EfCore
 - **.NET 10.0**
 
 ### Required Package Dependencies
-- [`Mingoll.OpenIddict.Management.Core`](../OpenIddict.Management.Core/README.md) (Abstractions, models, contracts)
+- [`Mingoll.OpenIddict.Management.Core`](../OpenIddict.Management.Core/README.md) (Abstractions, models, contracts, audit logging)
 - `OpenIddict.EntityFrameworkCore` (>= 6.x / 7.x)
 - `Microsoft.EntityFrameworkCore.Relational` (>= 8.x / 9.x)
 
@@ -94,11 +94,12 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
-// Registers Core services, EF Core stores, and OpenIddict Core entity mappings in one call
+// Registers Core services, EF Core stores, event dispatching, and OpenIddict Core entity mappings in one call
 builder.Services.AddOpenIddictManagement<ApplicationDbContext>(options =>
 {
     options.RoutePrefix = "/api/management";
     options.RequireHttps = true;
+    options.EnableAuditLogging = true;
 });
 ```
 
@@ -108,8 +109,11 @@ builder.Services.AddOpenIddictManagement<ApplicationDbContext>(options =>
 using OpenIddict.Management.Extensions;
 using OpenIddict.Management.Storage.EfCore.Extensions;
 
-builder.Services.AddOpenIddictManagement()
-    .AddEfCoreStores<ApplicationDbContext>();
+builder.Services.AddOpenIddictManagement(options =>
+{
+    options.EnableAuditLogging = true;
+})
+.AddEfCoreStores<ApplicationDbContext>();
 ```
 
 #### Option C: Custom Primary Key Type (`TKey`)
@@ -131,11 +135,28 @@ builder.Services.AddTokenStore<MyCustomTokenStore>();
 
 ---
 
+## Store Implementations & Features
+
+- **`EfCoreApplicationManagementStore` (`IApplicationManagementService`)**:
+  - Full CRUD operations with rich entity mapping (`Status`, `Environment`, `Tags`, `AllowedRolesJson`, `Description`, `ExtraData`).
+  - Native client secret rotation with `UpdateClientSecretAsync`.
+  - Batch operations: `BulkCreateAsync` and `BulkDeleteAsync` returning `BulkOperationResultDto`.
+  - Environment-wide status transitions via `SetStatusByEnvironmentAsync`.
+  - Automatic event dispatching to `IManagementEventPublisher` for audit trail tracking.
+- **`EfCoreScopeManagementStore` (`IScopeManagementService`)**:
+  - Scope CRUD, resource mappings, descriptions, and paginated searches.
+  - Batch creation (`BulkCreateAsync`) and batch deletion (`BulkDeleteAsync`).
+- **`EfCoreTokenStore` (`IOpenIddictTokenManager`)**:
+  - Filtered token queries, token count aggregations, and daily issuance timelines.
+  - Revocation by user ID, client ID, session ID, or individual token ID.
+- **`EfCoreAuthorizationStore` (`IOpenIddictAuthorizationManager`)**:
+  - Authorization tracking, session queries, and bulk session revocation.
+
+---
+
 ## Usage Example
 
 ### Injecting and Using Management Services
-
-All contracts from `OpenIddict.Management.Core` are registered in Dependency Injection and backed by EF Core stores:
 
 ```csharp
 using OpenIddict.Abstractions;
@@ -176,11 +197,20 @@ public class IdentityAdministrationService(
         {
             throw new InvalidOperationException($"Creation failed: {createResult.Error.Description}");
         }
+
+        // 2. Rotate client secret
+        await applicationService.UpdateClientSecretAsync(
+            createResult.Value!.Id, 
+            "NewRotatedSecretKey987654!", 
+            cancellationToken);
+
+        // 3. Batch delete applications
+        await applicationService.BulkDeleteAsync(["old-app-id-1", "old-app-id-2"], cancellationToken);
     }
 
     public async Task RevokeUserSessionsAsync(string userId, CancellationToken cancellationToken)
     {
-        // 2. Revoke all active tokens for a specific user across all clients
+        // Revoke all active tokens for a specific user across all clients
         Result<RevocationResultDto> revocationResult = await tokenManager.RevokeByUserAsync(userId, cancellationToken);
         if (revocationResult.IsSuccess)
         {
@@ -190,7 +220,7 @@ public class IdentityAdministrationService(
 
     public async Task<PagedResult<TokenListDto>> QueryActiveTokensAsync(CancellationToken cancellationToken)
     {
-        // 3. Query tokens with typed filters
+        // Query tokens with typed filters
         var filter = new TokenFilterRequest
         {
             Page = 1,
@@ -211,6 +241,6 @@ public class IdentityAdministrationService(
 
 | Package | Purpose |
 |---|---|
-| [`Mingoll.OpenIddict.Management.Core`](../OpenIddict.Management.Core/README.md) | Shared contracts, DTOs, domain models, login engine, and options. |
+| [`Mingoll.OpenIddict.Management.Core`](../OpenIddict.Management.Core/README.md) | Shared contracts, DTOs, domain models, audit trail models, and options. |
 | [`Mingoll.OpenIddict.Management.Endpoints`](../OpenIddict.Management.Endpoints/README.md) | Ready-to-map ASP.NET Core Minimal API endpoint groups. |
 | [`Mingoll.OpenIddict.Management.Dashboard`](../OpenIddict.Management.Dashboard/README.md) | Razor Class Library admin dashboard UI for visual database administration. |

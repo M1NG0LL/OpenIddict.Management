@@ -9,7 +9,7 @@ namespace OpenIddict.Management.Services;
 /// <summary>
 /// Thread-safe singleton managing configuration, execution cycles, and status of the token cleanup job.
 /// </summary>
-public class TokenCleanupJobManager : ITokenCleanupJobManager
+public class TokenCleanupJobManager : ITokenCleanupJobManager, IDisposable
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<TokenCleanupJobManager>? _logger;
@@ -179,14 +179,15 @@ public class TokenCleanupJobManager : ITokenCleanupJobManager
     {
         try
         {
-            if (_wakeUpSignal.CurrentCount == 0)
-            {
-                _wakeUpSignal.Release();
-            }
+            _wakeUpSignal.Release();
         }
         catch (SemaphoreFullException)
         {
             // Already signaled
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed
         }
     }
 
@@ -212,10 +213,16 @@ public class TokenCleanupJobManager : ITokenCleanupJobManager
             currentIncludeRevoked = _includeRevoked;
         }
 
+        IServiceScope? createdScope = null;
         try
         {
-            using var scope = serviceProvider.GetRequiredService<IServiceScopeFactory>().CreateScope();
-            var tokenManager = scope.ServiceProvider.GetService<IOpenIddictTokenManager>();
+            var tokenManager = serviceProvider.GetService<IOpenIddictTokenManager>();
+            if (tokenManager is null)
+            {
+                var scopeFactory = serviceProvider.GetService<IServiceScopeFactory>() ?? _scopeFactory;
+                createdScope = scopeFactory.CreateScope();
+                tokenManager = createdScope.ServiceProvider.GetService<IOpenIddictTokenManager>();
+            }
 
             if (tokenManager is null)
             {
@@ -274,6 +281,10 @@ public class TokenCleanupJobManager : ITokenCleanupJobManager
             _logger?.LogError(ex, "Unexpected error during token cleanup cycle.");
             return 0;
         }
+        finally
+        {
+            createdScope?.Dispose();
+        }
     }
 
     /// <inheritdoc/>
@@ -292,6 +303,33 @@ public class TokenCleanupJobManager : ITokenCleanupJobManager
         catch (OperationCanceledException)
         {
             // Host is shutting down
+        }
+    }
+
+    private bool _disposed;
+
+    /// <summary>
+    /// Releases unmanaged resources used by the <see cref="TokenCleanupJobManager"/>.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Releases unmanaged and optionally managed resources.
+    /// </summary>
+    /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                _wakeUpSignal.Dispose();
+            }
+            _disposed = true;
         }
     }
 }

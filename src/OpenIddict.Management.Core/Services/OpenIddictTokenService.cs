@@ -2,6 +2,7 @@ using System.Collections;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using OpenIddict.Abstractions;
 using OpenIddict.Management.Contracts;
 using OpenIddict.Management.Enums;
@@ -17,11 +18,12 @@ public class OpenIddictTokenService : IOpenIddictTokenService
 {
     private const string DefaultAuthenticationScheme = "OpenIddict.Server.AspNetCore";
     private readonly IApplicationManagementService? _applicationService;
+    private readonly Microsoft.Extensions.Logging.ILogger<OpenIddictTokenService>? _logger;
 
     /// <summary>
     /// Initializes a new instance of <see cref="OpenIddictTokenService"/> without an application management service.
     /// </summary>
-    public OpenIddictTokenService() : this(null)
+    public OpenIddictTokenService() : this(null, null)
     {
     }
 
@@ -29,9 +31,21 @@ public class OpenIddictTokenService : IOpenIddictTokenService
     /// Initializes a new instance of <see cref="OpenIddictTokenService"/> with an optional application management service.
     /// </summary>
     /// <param name="applicationService">The application management service used to resolve client default scopes.</param>
-    public OpenIddictTokenService(IApplicationManagementService? applicationService)
+    public OpenIddictTokenService(IApplicationManagementService? applicationService) : this(applicationService, null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="OpenIddictTokenService"/> with an optional application management service and logger.
+    /// </summary>
+    /// <param name="applicationService">The application management service used to resolve client default scopes.</param>
+    /// <param name="logger">The logger instance.</param>
+    public OpenIddictTokenService(
+        IApplicationManagementService? applicationService,
+        Microsoft.Extensions.Logging.ILogger<OpenIddictTokenService>? logger)
     {
         _applicationService = applicationService;
+        _logger = logger;
     }
 
     /// <inheritdoc/>
@@ -197,9 +211,13 @@ public class OpenIddictTokenService : IOpenIddictTokenService
                 return result.Value.DefaultScopes;
             }
         }
-        catch
+        catch (OperationCanceledException)
         {
-            // Graceful fallback if application not found or operation cancelled
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to resolve default scopes for client ID '{ClientId}'.", clientId);
         }
 
         return [];
@@ -352,6 +370,44 @@ public class OpenIddictTokenService : IOpenIddictTokenService
                         identity.AddClaim(claim);
                     }
                 }
+                break;
+
+            case string str:
+                if (str.TrimStart().StartsWith('{'))
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(str);
+                        if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                        {
+                            foreach (var prop in doc.RootElement.EnumerateObject())
+                            {
+                                var claimValue = prop.Value.ValueKind == JsonValueKind.String
+                                    ? prop.Value.GetString() ?? string.Empty
+                                    : prop.Value.GetRawText();
+                                var claim = new Claim(prop.Name, claimValue);
+                                var dests = destinationResolver(claim);
+                                if (dests is not null)
+                                {
+                                    claim.SetDestinations(dests);
+                                }
+                                identity.AddClaim(claim);
+                            }
+                            break;
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        // Fall back to treating as raw string claim
+                    }
+                }
+                var rawStrClaim = new Claim("extra_data", str);
+                var rawStrDests = destinationResolver(rawStrClaim);
+                if (rawStrDests is not null)
+                {
+                    rawStrClaim.SetDestinations(rawStrDests);
+                }
+                identity.AddClaim(rawStrClaim);
                 break;
 
             default:

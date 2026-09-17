@@ -5,13 +5,14 @@
 @{
     ViewData["Title"] = "Settings";
     var currentTab = (Model.ActiveTab ?? "general").ToLowerInvariant();
-    if (currentTab != "general" && currentTab != "oidc" && currentTab != "tokens")
+    if (currentTab != "general" && currentTab != "oidc" && currentTab != "tokens" && currentTab != "export-import")
     {
         currentTab = "general";
     }
     var isGeneralActive = currentTab == "general" ? "active" : "";
     var isOidcActive = currentTab == "oidc" ? "active" : "";
     var isTokensActive = currentTab == "tokens" ? "active" : "";
+    var isExportImportActive = currentTab == "export-import" ? "active" : "";
 }
 
 <style>
@@ -103,6 +104,17 @@
         <span>Token Cleanup &amp; Background Job</span>
         <span class="tab-badge" style="background: @(Model.CleanupJobEnabled ? "rgba(52, 211, 153, 0.15)" : "rgba(251, 191, 36, 0.15)"); color: @(Model.CleanupJobEnabled ? "#34d399" : "#fbbf24");">
             @(Model.CleanupJobEnabled ? "Active" : "Paused")
+        </span>
+    </button>
+    <button type="button" class="tab-btn @isExportImportActive" id="tab-btn-export-import" onclick="switchSettingsTab('export-import')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Export &amp; Import</span>
+        <span class="tab-badge" style="background: @(Model.IsExportImportAvailable ? "rgba(52, 211, 153, 0.15)" : "rgba(251, 191, 36, 0.15)"); color: @(Model.IsExportImportAvailable ? "#34d399" : "#fbbf24");">
+            @(Model.IsExportImportAvailable ? "Ready" : "Unavailable")
         </span>
     </button>
 </div>
@@ -1129,6 +1141,155 @@
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- ============================================== -->
+<!-- TAB PANEL 4: EXPORT & IMPORT                   -->
+<!-- ============================================== -->
+<div id="tab-panel-export-import" class="tab-panel @isExportImportActive">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem;">
+        <!-- Card 1: Export -->
+        <div class="card" style="padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                    <div style="width: 40px; height: 40px; border-radius: var(--radius-sm); background: rgba(99, 102, 241, 0.15); color: var(--accent-primary, #818cf8); display: flex; align-items: center; justify-content: center;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin: 0;">Export Full Configuration</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.15rem 0 0 0;">Create and download a JSON configuration backup package.</p>
+                    </div>
+                </div>
+
+                <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin: 1rem 0;">
+                    Exports all registered applications, scopes, active OpenIddict Server runtime options (endpoints, token lifetimes, grant types, PKCE policies), and OpenIddict Management suite configurations into a portable, structured JSON document.
+                </p>
+
+                <div style="background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1rem; margin-bottom: 1.5rem;">
+                    <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; margin-bottom: 0.75rem;">Package Contents Overview</div>
+                    <div style="display: flex; flex-direction: column; gap: 0.65rem; font-size: 0.85rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                                Registered Applications
+                            </span>
+                            <span class="badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;">@Model.TotalApplicationsCount items</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+                                Registered Scopes
+                            </span>
+                            <span class="badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;">@Model.TotalScopesCount items</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                OpenIddict Server Options
+                            </span>
+                            <span class="badge" style="background: @(Model.IsServerConfigured ? "rgba(52, 211, 153, 0.15)" : "rgba(148, 163, 184, 0.15)"); color: @(Model.IsServerConfigured ? "#34d399" : "#94a3b8"); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;">
+                                @(Model.IsServerConfigured ? "Included" : "Not Detected")
+                            </span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                Management &amp; Cleanup Settings
+                            </span>
+                            <span class="badge" style="background: rgba(52, 211, 153, 0.15); color: #34d399; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;">Included</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <form method="post" asp-page-handler="ExportJson">
+                <button type="submit" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem 1rem;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Download Configuration Package (.json)</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Card 2: Import -->
+        <div class="card" style="padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                <div style="width: 40px; height: 40px; border-radius: var(--radius-sm); background: rgba(52, 211, 153, 0.15); color: #34d399; display: flex; align-items: center; justify-content: center;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                </div>
+                <div>
+                    <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin: 0;">Import Configuration</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.15rem 0 0 0;">Restore or migrate configuration from a package.</p>
+                </div>
+            </div>
+
+            <form method="post" asp-page-handler="ImportJson" enctype="multipart/form-data" style="margin-top: 1rem;">
+                <!-- File Upload -->
+                <div style="margin-bottom: 1rem;">
+                    <label class="form-label" style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 0.35rem;">
+                        Select JSON File
+                    </label>
+                    <input type="file" name="importFile" accept=".json,application/json" class="form-control" style="font-size: 0.85rem; padding: 0.45rem 0.75rem;" />
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin: 1rem 0;">
+                    <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+                    <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em;">OR Paste JSON Text</span>
+                    <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+                </div>
+
+                <!-- Raw JSON Textarea -->
+                <div style="margin-bottom: 1rem;">
+                    <textarea name="importJsonText" rows="4" class="form-control" placeholder="{ &quot;version&quot;: &quot;1.0&quot;, &quot;applications&quot;: [ ... ], &quot;openIddictServer&quot;: { ... } }" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.8rem; line-height: 1.4;"></textarea>
+                </div>
+
+                <!-- Import Options Checkboxes -->
+                <div style="background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem; margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.55rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; color: var(--text-primary);">
+                        <input type="checkbox" name="overwriteExisting" value="true" style="accent-color: var(--accent-primary, #818cf8); width: 16px; height: 16px;" />
+                        <span>Overwrite existing applications and scopes</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; color: var(--text-primary);">
+                        <input type="checkbox" name="importApplications" value="true" checked style="accent-color: var(--accent-primary, #818cf8); width: 16px; height: 16px;" />
+                        <span>Import applications</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; color: var(--text-primary);">
+                        <input type="checkbox" name="importScopes" value="true" checked style="accent-color: var(--accent-primary, #818cf8); width: 16px; height: 16px;" />
+                        <span>Import scopes</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; color: var(--text-primary);">
+                        <input type="checkbox" name="importConfigurations" value="true" checked style="accent-color: var(--accent-primary, #818cf8); width: 16px; height: 16px;" />
+                        <span>Import OpenIddict Server &amp; Management runtime configurations</span>
+                    </label>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.85rem; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.25); border-radius: var(--radius-sm); margin-bottom: 1.25rem; font-size: 0.8rem; color: #fbbf24;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <span>Imported server and management configurations take effect immediately in memory.</span>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem 1rem;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span>Import Configuration Package</span>
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 

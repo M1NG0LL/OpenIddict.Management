@@ -27,6 +27,8 @@ internal static class TokenEndpointsGroup
             [FromQuery(Name = "tokenType")] string? tokenType = null,
             [FromQuery(Name = "createdFrom")] DateTimeOffset? createdFrom = null,
             [FromQuery(Name = "createdTo")] DateTimeOffset? createdTo = null,
+            [FromQuery(Name = "sortBy")] string? sortBy = null,
+            [FromQuery(Name = "sortDescending")] bool sortDescending = true,
             [FromServices] IOpenIddictTokenManager manager = null!,
             CancellationToken cancellationToken = default) =>
         {
@@ -41,7 +43,9 @@ internal static class TokenEndpointsGroup
                 Status = status,
                 TokenType = tokenType,
                 CreatedFrom = createdFrom,
-                CreatedTo = createdTo
+                CreatedTo = createdTo,
+                SortBy = sortBy,
+                SortDescending = sortDescending
             };
 
             var result = await manager.ListTokensAsync(filter, cancellationToken);
@@ -127,6 +131,20 @@ internal static class TokenEndpointsGroup
         .WithSummary("Revoke token by identifier")
         .WithDescription("Revokes a specific token by its unique token database identifier.")
         .Produces<RevocationResultDto>(StatusCodes.Status200OK);
+
+        tokenGroup.MapGet("/{id}/introspect", async (
+            string id,
+            [FromServices] IOpenIddictTokenManager manager,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await manager.IntrospectTokenAsync(id, cancellationToken);
+            return result.ToHttpResult();
+        })
+        .WithName("IntrospectToken")
+        .WithSummary("Introspect token details and claims")
+        .WithDescription("Decodes and inspects a token by its database identifier or reference identifier, returning claims, active status, scopes, and expiration details.")
+        .Produces<TokenIntrospectionDto>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status404NotFound);
         tokenGroup.MapPost("/extend", async (
             [FromBody] ExtendTokenExpirationRequest request,
             [FromServices] IOpenIddictTokenManager manager,

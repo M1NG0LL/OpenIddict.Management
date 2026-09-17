@@ -40,10 +40,25 @@ public sealed record ManagedToken
     /// </summary>
     public DateTimeOffset? ExpirationDate { get; init; }
 
+    private readonly DateTimeOffset _createdAt;
+
     /// <summary>
-    /// Gets the creation date of the token.
+    /// Gets the UTC creation date of the token.
     /// </summary>
-    public required DateTimeOffset CreationDate { get; init; }
+    public DateTimeOffset CreatedAt
+    {
+        get => _createdAt;
+        init => _createdAt = value;
+    }
+
+    /// <summary>
+    /// Gets the UTC creation date of the token (alias for <see cref="CreatedAt"/>).
+    /// </summary>
+    public DateTimeOffset CreationDate
+    {
+        get => _createdAt;
+        init => _createdAt = value;
+    }
 
     /// <summary>
     /// Gets the redemption date of the token.

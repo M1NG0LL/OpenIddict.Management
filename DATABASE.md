@@ -20,8 +20,6 @@ The library extends standard OpenIddict EF Core entities with management-specifi
 | `Environment` | `ApplicationEnvironment` enum | Indexed | Deployment environment: `Development` (0), `Staging` (1), `Production` (2) |
 | `AllowedRolesJson` | `string?` | | JSON-serialized list of role names. Access via `GetAllowedRoles()` / `SetAllowedRoles()` |
 | `Description` | `string?` | MaxLength 500 | Free-text description |
-| `LogoUri` | `string?` | MaxLength 2000 | Logo URL |
-| `OwnerUserId` | `string?` | MaxLength 450, Indexed | User who owns this application |
 | `CreatedAt` | `DateTimeOffset` | | UTC creation timestamp |
 | `LastModifiedAt` | `DateTimeOffset?` | | UTC last modification timestamp |
 | `ExtraData` | `string?` | | Arbitrary JSON metadata |
@@ -72,12 +70,10 @@ Applied via `IEntityTypeConfiguration<ManagementApplication<TKey>>`:
 ```csharp
 builder.ToTable("OpenIddictApplications");
 builder.Property(a => a.Description).HasMaxLength(500);
-builder.Property(a => a.LogoUri).HasMaxLength(2000);
-builder.Property(a => a.OwnerUserId).HasMaxLength(450);
+builder.Property(a => a.DefaultScopes);
 builder.PrimitiveCollection(a => a.Tags);
 builder.HasIndex(a => a.Status);
 builder.HasIndex(a => a.Environment);
-builder.HasIndex(a => a.OwnerUserId);
 ```
 
 ### `ManagementAuthorizationConfiguration<TKey>`

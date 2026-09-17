@@ -37,16 +37,6 @@ public class ManagementApplication<TKey> : OpenIddictEntityFrameworkCoreApplicat
     public string? Description { get; set; }
 
     /// <summary>
-    /// Gets or sets the logo URI for the application.
-    /// </summary>
-    public string? LogoUri { get; set; }
-
-    /// <summary>
-    /// Gets or sets the user ID of the application owner.
-    /// </summary>
-    public string? OwnerUserId { get; set; }
-
-    /// <summary>
     /// Gets or sets the UTC timestamp when the application was created.
     /// </summary>
     public DateTimeOffset CreatedAt { get; set; }

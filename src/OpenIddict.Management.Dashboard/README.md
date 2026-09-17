@@ -7,7 +7,7 @@
 
 `OpenIddict.Management.Dashboard` (`Mingoll.OpenIddict.Management.Dashboard`) is a turnkey Razor Class Library (RCL) that embeds a full-featured, responsive administrative UI directly into your ASP.NET Core OpenIddict host.
 
-Install this package when you need a ready-to-use graphical interface to visually manage OAuth2/OIDC client applications, inspect tokens, revoke user sessions, configure scopes, and monitor identity server metrics without needing to design, build, or host a separate frontend admin application.
+Install this package when you need a ready-to-use graphical interface to visually manage OAuth2/OIDC client applications, inspect tokens, revoke user sessions, configure scopes, manage background token pruning, audit administrative events, and perform full configuration backup and restoration without designing or hosting a separate frontend application.
 
 ---
 
@@ -82,18 +82,21 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
-builder.Services.AddOpenIddictManagement<ApplicationDbContext>()
-    .AddDashboard(options =>
-    {
-        options.PathPrefix = "/admin/identity";
-        options.DashboardTitle = "Enterprise Identity Admin";
-        options.ExitUrl = "/";
-        options.ExitButtonText = "Back to App";
-        options.RequireAuthorization = true;
-        options.AuthorizationPolicy = "IdentityAdminPolicy";
-        options.EnabledFeatures = DashboardFeature.All;
-        options.AvailableTags = ["Internal", "Partner", "Production", "Mobile"];
-    });
+builder.Services.AddOpenIddictManagement<ApplicationDbContext>(options =>
+{
+    options.EnableAuditLogging = true;
+})
+.AddDashboard(options =>
+{
+    options.PathPrefix = "/admin/identity";
+    options.DashboardTitle = "Enterprise Identity Admin";
+    options.ExitUrl = "/";
+    options.ExitButtonText = "Back to App";
+    options.RequireAuthorization = true;
+    options.AuthorizationPolicy = "IdentityAdminPolicy";
+    options.EnabledFeatures = DashboardFeature.All;
+    options.AvailableTags = ["Internal", "Partner", "Production", "Mobile"];
+});
 
 var app = builder.Build();
 
@@ -111,8 +114,6 @@ app.Run();
 ```
 
 ### Configuration via `appsettings.json`
-
-You can define dashboard options in `appsettings.json` and bind them:
 
 ```json
 {
@@ -162,31 +163,60 @@ The `DashboardOptions` class supports the following settings:
 The `DashboardFeature` enum allows enabling or disabling specific dashboard modules:
 
 ```csharp
-// Example: Enable only Application and Scope management, hiding Token Inspector
+// Example: Enable only Application, Scope, and Settings management
 options.EnabledFeatures = DashboardFeature.ApplicationManagement | DashboardFeature.ScopeManager;
 ```
 
 Available flags:
-- `DashboardFeature.ApplicationManagement` — Client application list, registration, credential rotation, and permission editor.
+- `DashboardFeature.ApplicationManagement` — Client application list, registration, credential rotation, bulk actions, and permission editor.
 - `DashboardFeature.TokenInspector` — Live token browser, search, details viewer, and expiration extender.
-- `DashboardFeature.SessionManager` — Active session monitoring and revocation by user or session ID.
-- `DashboardFeature.ScopeManager` — Scope registry, descriptions, and resource mappings.
-- `DashboardFeature.AuditTrail` — High-level metric counters and historical issuance timelines.
+- `DashboardFeature.SessionManager` — Active session monitoring and revocation by user, client, or session ID.
+- `DashboardFeature.ScopeManager` — Scope registry, descriptions, resource mappings, and bulk deletion.
+- `DashboardFeature.AuditTrail` — Security and administrative audit trail with filtering and event inspection.
 - `DashboardFeature.All` — Enables all features (default).
 
 ---
 
-## Usage Example
+## Admin Interface Modules
 
-### Navigating the Admin Interface
+Navigating to your configured `PathPrefix` (e.g., `https://localhost:5001/admin/identity`) provides access to:
 
-Once mounted, navigating to `https://localhost:5001/admin/identity` provides:
+### 1. Overview (`/`)
+- Real-time metric cards: total applications, active access/refresh tokens, registered scopes, and active authorizations.
+- Daily token issuance timeline chart.
+- Quick health status and background cleanup worker indicators.
 
-1. **Dashboard Home (`/admin/identity`)**: Real-time system overview cards (total applications, active access/refresh tokens, registered scopes), token issuance timeline charts, and cleanup worker status.
-2. **Applications (`/admin/identity/applications`)**: Search and filter client apps by environment, status, or tag. Create new public/confidential apps with granular OpenIddict permissions, redirect URIs, and secret generation.
-3. **Tokens (`/admin/identity/tokens`)**: Inspect active, expired, and revoked tokens. View token details, extend valid expiration dates, or revoke individual tokens.
-4. **Scopes (`/admin/identity/scopes`)**: Configure OAuth scopes, assign descriptions, and associate target API resource servers.
-5. **Settings (`/admin/identity/settings`)**: Inspect background cleanup worker telemetry, adjust batch pruning parameters, or trigger an immediate cleanup run.
+### 2. Applications (`/applications`)
+- Paginated table of registered OpenIddict client applications with filtering by environment (`Development`, `Staging`, `Production`), status (`Active`, `Suspended`, `Revoked`), and custom tags.
+- Client creation wizard with comprehensive OpenIddict permissions catalog and redirect URI validation.
+- Client secret generation and rotation with instant reveal.
+- **Bulk Actions**: Batch activate, suspend, or delete multiple applications at once.
+
+### 3. Scopes (`/scopes`)
+- Scope registry displaying standard and custom OAuth2/OIDC scopes.
+- Detail and edit forms for descriptions and associated target API resource servers.
+- **Bulk Actions**: Batch deletion of scopes.
+
+### 4. Tokens & Sessions (`/tokens`, `/sessions`)
+- Live token browser with status indicators (`Valid`, `Expired`, `Revoked`).
+- Extend token expiration dates or revoke individual tokens.
+- Revocation actions targeting all tokens for a user, client, or authorization session.
+
+### 5. Audit Trail (`/audit`)
+- Real-time audit log of administrative and security events (application created/modified, secret rotated, bulk operations executed, tokens pruned).
+- Filter by category, action type, actor, and status.
+
+### 6. Settings (`/settings`)
+- **Configuration Export & Import**:
+  - **Export Package**: One-click download of the complete system backup as a structured JSON file (`ManagementExportPackage` with dynamic `VersionPrefix` derived from the assembly metadata, e.g. `1.1.0`). Contains applications, scopes, OpenIddict Server options, and Management settings.
+  - **Import Package**: Upload backup `.json` files or paste raw JSON directly.
+  - **Granular Restoration**: Selectively toggle whether to overwrite existing items, import applications, import scopes, and import runtime OpenIddict Server and Management options.
+- **Background Token Cleanup**:
+  - Live worker telemetry (last run time, status, last pruned count, total pruned tokens).
+  - Runtime adjustments of cleanup interval schedule and batch pruning size.
+  - Trigger immediate on-demand cleanup execution.
+- **Audit Logging Configuration**:
+  - View operational status of audit trail logging.
 
 ---
 

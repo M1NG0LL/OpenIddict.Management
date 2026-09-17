@@ -76,7 +76,7 @@ internal static class ScopeEndpointsGroup
             [FromServices] IScopeManagementService service,
             CancellationToken cancellationToken) =>
         {
-            var result = await service.CreateAsync(request.Name, request.DisplayName, request.Description, request.Resources, cancellationToken);
+            var result = await service.CreateAsync(request, cancellationToken);
             return result.ToHttpResult(scope => HttpResults.Created($"/scopes/{scope.Id}", scope));
         })
         .WithName("CreateScope")
@@ -92,7 +92,7 @@ internal static class ScopeEndpointsGroup
             [FromServices] IScopeManagementService service,
             CancellationToken cancellationToken) =>
         {
-            var result = await service.UpdateAsync(id, request.DisplayName, request.Description, request.Resources, cancellationToken);
+            var result = await service.UpdateAsync(id, request, cancellationToken);
             return result.ToHttpResult();
         })
         .WithName("UpdateScope")
@@ -115,6 +115,34 @@ internal static class ScopeEndpointsGroup
         .WithDescription("Deletes an OpenID Connect scope by its unique database identifier.")
         .Produces(StatusCodes.Status204NoContent)
         .Produces(StatusCodes.Status404NotFound);
+
+        scopeGroup.MapPost("/bulk-create", async (
+            [FromBody] IEnumerable<CreateScopeRequest> requests,
+            [FromServices] IScopeManagementService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.BulkCreateAsync(requests, cancellationToken);
+            return result.ToHttpResult();
+        })
+        .WithName("BulkCreateScopes")
+        .WithSummary("Bulk create scopes")
+        .WithDescription("Registers multiple OpenID Connect scopes in a single batch operation.")
+        .Produces<BulkOperationResultDto>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status400BadRequest);
+
+        scopeGroup.MapPost("/bulk-delete", async (
+            [FromBody] IEnumerable<string> ids,
+            [FromServices] IScopeManagementService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.BulkDeleteAsync(ids, cancellationToken);
+            return result.ToHttpResult();
+        })
+        .WithName("BulkDeleteScopes")
+        .WithSummary("Bulk delete scopes")
+        .WithDescription("Deletes multiple OpenID Connect scopes by their identifiers in a single batch operation.")
+        .Produces<BulkOperationResultDto>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status400BadRequest);
 
         return scopeGroup;
     }
