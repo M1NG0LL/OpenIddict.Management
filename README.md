@@ -47,7 +47,7 @@ OpenIddict is powerful but verbose. This library wraps the ceremony into clean A
 
 | Package | Description | Dependencies |
 |---|---|---|
-| `OpenIddict.Management.Core` | Contracts, models, DTOs, login engine, token service, `Result<T>` pattern, options, builder, validation | `OpenIddict.Abstractions`, `OpenIddict.Server` |
+| `OpenIddict.Management.Core` | Contracts, models, DTOs, login engine, token service, `Result<T>` pattern, options, builder, validation | `OpenIddict.Abstractions`, `OpenIddict.Server`, `OpenIddict.Validation` |
 | `OpenIddict.Management.Storage.EfCore` | EF Core entities, store implementations, `ModelBuilder` extensions, entity configurations | Core, `OpenIddict.EntityFrameworkCore` |
 | `OpenIddict.Management.Endpoints` | Minimal API endpoint groups with validation filters & exception mapping | Core |
 | `OpenIddict.Management.Dashboard` | Razor Class Library admin UI (pages, layout, middleware, static assets) | Core, Endpoints |
@@ -106,6 +106,11 @@ builder.Services
     .AddOpenIddictManagement()
     .AddEfCoreStores<AppDbContext>()
     .AddAuthenticationProvider<MyAuthProvider>()
+    .AddApplicationValidation(options =>
+    {
+        options.RequireStatus(ApplicationStatus.Active);
+        options.RequireEnvironments(ApplicationEnvironment.Production, ApplicationEnvironment.Staging);
+    })
     .AddTokenService<MyCustomTokenService>()
     .AddLoginEngine<MyCustomLoginEngine>();
 ```
@@ -132,6 +137,7 @@ builder.Services
 OpenIddict.Management provides configurable options across its layers:
 
 - **`OpenIddictManagementOptions`** — Core routing defaults, HTTPS enforcement, and pagination limits (`RoutePrefix`, `RequireHttps`, `DefaultPageSize`, `MaxPageSize`). Configured via `AddOpenIddictManagement(options => ...)`.
+- **`OpenIddictApplicationValidationOptions`** — Application operational status and deployment environment verification across all OAuth2/OIDC flows, with custom property rules (`ValidateStatus`, `AllowedStatuses`, `ValidateEnvironment`, `AllowedEnvironments`, `ValidateCustom`). Configured via `AddApplicationValidation(options => ...)`.
 - **`ManagementEndpointOptions`** — HTTP Minimal API endpoint route prefix, authorization policy, and OpenAPI tags (`RoutePrefix`, `AuthorizationPolicy`, `RequireAuthorization`, `Tags`). Configured via `MapOpenIddictManagementEndpoints(options => ...)`.
 - **`DashboardOptions`** — UI path prefix, title, exit URL, authorization policy, feature flags (`DashboardFeature`), and selectable tags. Configured via `AddDashboard(options => ...)`.
 

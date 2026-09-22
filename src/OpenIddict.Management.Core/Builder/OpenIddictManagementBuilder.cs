@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using OpenIddict.Management.Contracts;
+using OpenIddict.Management.Extensions;
 using OpenIddict.Management.Models;
 using OpenIddict.Management.Options;
 using OpenIddict.Management.Services;
@@ -107,6 +108,17 @@ public sealed class OpenIddictManagementBuilder(IServiceCollection services)
         {
             Services.AddHostedService<TokenCleanupBackgroundService>();
         }
+        return this;
+    }
+
+    /// <summary>
+    /// Configures custom OpenIddict application validation for status, environment, and custom properties across any authentication/token flow.
+    /// </summary>
+    /// <param name="configure">Optional configuration delegate for application validation options.</param>
+    /// <returns>The fluent builder instance.</returns>
+    public OpenIddictManagementBuilder AddApplicationValidation(Action<OpenIddictApplicationValidationOptions>? configure = null)
+    {
+        Services.AddOpenIddictApplicationValidation(configure);
         return this;
     }
 

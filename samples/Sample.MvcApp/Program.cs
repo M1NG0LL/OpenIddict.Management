@@ -96,6 +96,14 @@ builder.Services.AddOpenIddict()
 // Configure OpenIddict Management Suite, Custom Provider, and Embedded Admin Dashboard
 builder.Services.AddOpenIddictManagement<SampleDbContext>()
     .AddAuthenticationProvider<SampleUserAuthProvider, SampleLoginRequest>()
+    .AddApplicationValidation(options =>
+    {
+        // Enforce that only Active client applications are permitted to authenticate across any flow
+        options.RequireStatus(ApplicationStatus.Active);
+
+        // Validate deployment environment (permitting Development in this sample app)
+        options.RequireEnvironments(ApplicationEnvironment.Development, ApplicationEnvironment.Staging, ApplicationEnvironment.Production);
+    })
     .AddDashboard(options =>
     {
         options.PathPrefix = "/admin/identity";
