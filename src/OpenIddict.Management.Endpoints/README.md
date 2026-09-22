@@ -164,7 +164,7 @@ When mapped, the package exposes the following REST route groups under the confi
 ### Configuration Export & Import (`/configuration`)
 | Method | Route | Description |
 |---|---|---|
-| `GET` | `/api/management/configuration/export` | Exports a structured JSON backup package (`ManagementExportPackage` with dynamic `VersionPrefix`, e.g. `1.1.0`) containing applications, scopes, OpenIddict Server options, and Management options. |
+| `GET` | `/api/management/configuration/export` | Exports a structured JSON backup package (`ManagementExportPackage` with dynamic `VersionPrefix`, e.g. `1.2.0`) containing applications, scopes, OpenIddict Server options, and Management options. |
 | `POST` | `/api/management/configuration/import` | Imports and applies an exported configuration package. Supports query flags: `?overwrite=false`, `?importApplications=true`, `?importScopes=true`, `?importConfigurations=true`. |
 
 ### Audit Trail (`/audit`)
@@ -217,7 +217,7 @@ Response:
 
 ```json
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "exportedAt": "2026-09-18T00:00:00Z",
   "applications": [ ... ],
   "scopes": [ ... ],

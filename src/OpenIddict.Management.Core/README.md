@@ -58,7 +58,7 @@ Install-Package Mingoll.OpenIddict.Management.Core
 - **Full Configuration Export & Import (`IConfigurationExportImportService`)**:
   - Export and import applications and scopes.
   - Export and import complete OpenIddict Server runtime options (`OpenIddictServerOptions`) and Management settings (`OpenIddictManagementOptions`, `TokenCleanupOptions`).
-  - Container package `ManagementExportPackage` with dynamic **`VersionPrefix`** resolution from assembly metadata (e.g., `1.1.0`).
+  - Container package `ManagementExportPackage` with dynamic **`VersionPrefix`** resolution from assembly metadata (e.g., `1.2.0`).
   - Granular import options (`OverwriteExisting`, `ImportApplications`, `ImportScopes`, `ImportConfigurations`).
 - **Audit Trail & Logging (`ManagementAuditEntry`, `IAuditTrailStore`)**:
   - Captures security and administrative events (`Category`, `Action`, `EntityId`, `EntityName`, `Actor`, `Details`, `Success`, `ErrorMessage`, `Timestamp`).
@@ -198,7 +198,7 @@ public class ConfigurationBackup(IConfigurationExportImportService exportImportS
     public async Task BackupAndRestoreAsync(CancellationToken cancellationToken)
     {
         // 1. Export entire configuration (Apps, Scopes, Server Options, Management Options)
-        // Note: Package version dynamically resolves to project VersionPrefix (e.g., "1.1.0")
+        // Note: Package version dynamically resolves to project VersionPrefix (e.g., "1.2.0")
         var exportResult = await exportImportService.ExportConfigurationAsync(cancellationToken);
         ManagementExportPackage package = exportResult.Value!;
 

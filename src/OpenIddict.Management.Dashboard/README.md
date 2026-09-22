@@ -208,7 +208,7 @@ Navigating to your configured `PathPrefix` (e.g., `https://localhost:5001/admin/
 
 ### 6. Settings (`/settings`)
 - **Configuration Export & Import**:
-  - **Export Package**: One-click download of the complete system backup as a structured JSON file (`ManagementExportPackage` with dynamic `VersionPrefix` derived from the assembly metadata, e.g. `1.1.0`). Contains applications, scopes, OpenIddict Server options, and Management settings.
+  - **Export Package**: One-click download of the complete system backup as a structured JSON file (`ManagementExportPackage` with dynamic `VersionPrefix` derived from the assembly metadata, e.g. `1.2.0`). Contains applications, scopes, OpenIddict Server options, and Management settings.
   - **Import Package**: Upload backup `.json` files or paste raw JSON directly.
   - **Granular Restoration**: Selectively toggle whether to overwrite existing items, import applications, import scopes, and import runtime OpenIddict Server and Management options.
 - **Background Token Cleanup**:

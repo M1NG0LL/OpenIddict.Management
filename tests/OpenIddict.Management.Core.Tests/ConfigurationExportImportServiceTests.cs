@@ -54,7 +54,7 @@ public class ConfigurationExportImportServiceTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
         result.Value!.Version.Should().Be(ManagementExportPackage.VersionPrefix);
-        result.Value.Version.Should().Be("1.1.0");
+        result.Value.Version.Should().Be("1.2.0");
         result.Value.Applications.Should().ContainSingle();
         result.Value.Applications[0].ClientId.Should().Be("app-1");
         result.Value.Applications[0].ClientType.Should().Be("confidential");
@@ -383,8 +383,8 @@ public class ConfigurationExportImportServiceTests
     [Fact]
     public void ManagementExportPackage_VersionPrefix_ResolvesFromAssemblyMetadata()
     {
-        ManagementExportPackage.VersionPrefix.Should().Be("1.1.0");
+        ManagementExportPackage.VersionPrefix.Should().Be("1.2.0");
         var package = new ManagementExportPackage();
-        package.Version.Should().Be("1.1.0");
+        package.Version.Should().Be("1.2.0");
     }
 }
