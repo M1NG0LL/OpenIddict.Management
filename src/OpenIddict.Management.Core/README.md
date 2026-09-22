@@ -70,6 +70,10 @@ Install-Package Mingoll.OpenIddict.Management.Core
 - **Background Token Pruning & Management (`ITokenCleanupJobManager`)**:
   - Scheduled background pruning of expired and revoked tokens.
   - Runtime adjustments of interval, batch size, and manual trigger (`RunCleanupNowAsync`).
+- **Application Status & Environment Validation (`IOpenIddictValidationHandler<>`, `IOpenIddictServerHandler<>`, `IOpenIddictApplicationValidator`)**:
+  - Automatically intercepts login and token requests across **any flow** (`authorization_code`, `client_credentials`, `password`, `refresh_token`, `device_code`) and the interactive `/connect/authorize` endpoint.
+  - Enforces access token validation in OpenIddict.Validation via `IOpenIddictValidationHandler<ProcessAuthenticationContext>`.
+  - Configurable via `.AddApplicationValidation(options => ...)` to enforce operational statuses (`Active`, `Disabled`, `Deleted`), deployment environments (`Development`, `Staging`, `Production`), and custom developer validation rules (`ValidateCustom`).
 
 ---
 
@@ -93,6 +97,11 @@ builder.Services.AddOpenIddictManagement(options =>
     options.EnableAuditLogging = true; // Toggle audit logging
 })
 .AddAuthenticationProvider<AppUserAuthenticationProvider>()
+.AddApplicationValidation(options =>
+{
+    options.RequireStatus(ApplicationStatus.Active);
+    options.RequireEnvironments(ApplicationEnvironment.Production, ApplicationEnvironment.Staging);
+})
 .AddTokenCleanup(options =>
 {
     options.IsEnabled = true;
@@ -278,6 +287,35 @@ app.MapPost("/api/cleanup/trigger", async (ITokenCleanupJobManager cleanupManage
         ? Results.Ok(new { PrunedTokens = cleanupResult.Value })
         : Results.BadRequest(new { Error = cleanupResult.Error.Description });
 });
+```
+
+### 6. Custom Application Status, Environment & Property Validation
+
+Use `AddApplicationValidation` to enforce operational status and environment constraints across all OpenIddict server login flows (`authorization_code`, `client_credentials`, `password`, `refresh_token`, `device_code`) as well as `OpenIddict.Validation` token checks:
+
+```csharp
+builder.Services.AddOpenIddictManagement<MyDbContext>()
+    .AddApplicationValidation(options =>
+    {
+        // 1. Only Active applications can authenticate
+        options.RequireStatus(ApplicationStatus.Active);
+
+        // 2. Allow only applications configured for Production or Staging
+        options.RequireEnvironments(ApplicationEnvironment.Production, ApplicationEnvironment.Staging);
+
+        // 3. Custom developer validation rules (inspecting tags, roles, extra data, grant types)
+        options.ValidateCustom((application, context) =>
+        {
+            if (application.HasTag("InternalOnly") && context.EndpointType == "Authorization")
+            {
+                return ApplicationValidationResult.Failed(
+                    error: OpenIddictConstants.Errors.UnauthorizedClient,
+                    errorDescription: "Internal applications cannot use the interactive authorization endpoint.");
+            }
+
+            return ApplicationValidationResult.Success();
+        });
+    });
 ```
 
 ---
