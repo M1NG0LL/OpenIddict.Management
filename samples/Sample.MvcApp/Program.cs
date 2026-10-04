@@ -54,7 +54,7 @@ builder.Services.AddOpenIddict()
                .SetTokenEndpointUris("/connect/token")
                .SetIntrospectionEndpointUris("/connect/introspect")
                .SetRevocationEndpointUris("/connect/revocation")
-               .SetLogoutEndpointUris("/connect/logout");
+               .SetEndSessionEndpointUris("/connect/logout");
 
         options.AllowAuthorizationCodeFlow()
                .AllowClientCredentialsFlow()
@@ -76,7 +76,7 @@ builder.Services.AddOpenIddict()
         options.UseAspNetCore()
                .EnableTokenEndpointPassthrough()
                .EnableAuthorizationEndpointPassthrough()
-               .EnableLogoutEndpointPassthrough();
+               .EnableEndSessionEndpointPassthrough();
 
         options.SetAccessTokenLifetime(TimeSpan.FromDays(365));
         options.SetRefreshTokenLifetime(TimeSpan.FromDays(365));
@@ -152,7 +152,7 @@ using (var scope = app.Services.CreateScope())
     {
         OpenIddictConstants.Permissions.Endpoints.Authorization,
         OpenIddictConstants.Permissions.Endpoints.Token,
-        OpenIddictConstants.Permissions.Endpoints.Logout,
+        OpenIddictConstants.Permissions.Endpoints.EndSession,
         OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
         OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
         OpenIddictConstants.Permissions.ResponseTypes.Code,

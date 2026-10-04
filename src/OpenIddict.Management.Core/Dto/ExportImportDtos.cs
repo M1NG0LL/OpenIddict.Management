@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json.Serialization;
 using OpenIddict.Management.Enums;
 
 namespace OpenIddict.Management.Dto;
@@ -120,11 +121,11 @@ public sealed record OpenIddictServerConfigurationDto
     /// <summary>Gets token endpoint URIs.</summary>
     public IReadOnlyList<string> TokenEndpointUris { get; init; } = [];
 
-    /// <summary>Gets logout endpoint URIs.</summary>
-    public IReadOnlyList<string> LogoutEndpointUris { get; init; } = [];
+    /// <summary>Gets end session (logout) endpoint URIs.</summary>
+    public IReadOnlyList<string> EndSessionEndpointUris { get; init; } = [];
 
     /// <summary>Gets userinfo endpoint URIs.</summary>
-    public IReadOnlyList<string> UserinfoEndpointUris { get; init; } = [];
+    public IReadOnlyList<string> UserInfoEndpointUris { get; init; } = [];
 
     /// <summary>Gets introspection endpoint URIs.</summary>
     public IReadOnlyList<string> IntrospectionEndpointUris { get; init; } = [];
@@ -132,17 +133,42 @@ public sealed record OpenIddictServerConfigurationDto
     /// <summary>Gets revocation endpoint URIs.</summary>
     public IReadOnlyList<string> RevocationEndpointUris { get; init; } = [];
 
-    /// <summary>Gets device endpoint URIs.</summary>
-    public IReadOnlyList<string> DeviceEndpointUris { get; init; } = [];
+    /// <summary>Gets device authorization endpoint URIs.</summary>
+    public IReadOnlyList<string> DeviceAuthorizationEndpointUris { get; init; } = [];
 
-    /// <summary>Gets verification endpoint URIs.</summary>
-    public IReadOnlyList<string> VerificationEndpointUris { get; init; } = [];
+    /// <summary>Gets end user verification endpoint URIs.</summary>
+    public IReadOnlyList<string> EndUserVerificationEndpointUris { get; init; } = [];
 
-    /// <summary>Gets cryptography endpoint URIs.</summary>
-    public IReadOnlyList<string> CryptographyEndpointUris { get; init; } = [];
+    /// <summary>Gets JSON Web Key Set (cryptography) endpoint URIs.</summary>
+    public IReadOnlyList<string> JsonWebKeySetEndpointUris { get; init; } = [];
 
     /// <summary>Gets configuration discovery endpoint URIs.</summary>
     public IReadOnlyList<string> ConfigurationEndpointUris { get; init; } = [];
+
+    /// <summary>Legacy alias for <see cref="EndSessionEndpointUris"/>.</summary>
+    [JsonIgnore]
+    [Obsolete("Use EndSessionEndpointUris instead.")]
+    public IReadOnlyList<string> LogoutEndpointUris { get; init; } = [];
+
+    /// <summary>Legacy alias for <see cref="UserInfoEndpointUris"/>.</summary>
+    [JsonIgnore]
+    [Obsolete("Use UserInfoEndpointUris instead.")]
+    public IReadOnlyList<string> UserinfoEndpointUris { get; init; } = [];
+
+    /// <summary>Legacy alias for <see cref="DeviceAuthorizationEndpointUris"/>.</summary>
+    [JsonIgnore]
+    [Obsolete("Use DeviceAuthorizationEndpointUris instead.")]
+    public IReadOnlyList<string> DeviceEndpointUris { get; init; } = [];
+
+    /// <summary>Legacy alias for <see cref="EndUserVerificationEndpointUris"/>.</summary>
+    [JsonIgnore]
+    [Obsolete("Use EndUserVerificationEndpointUris instead.")]
+    public IReadOnlyList<string> VerificationEndpointUris { get; init; } = [];
+
+    /// <summary>Legacy alias for <see cref="JsonWebKeySetEndpointUris"/>.</summary>
+    [JsonIgnore]
+    [Obsolete("Use JsonWebKeySetEndpointUris instead.")]
+    public IReadOnlyList<string> CryptographyEndpointUris { get; init; } = [];
 
     // --- Lifetimes ---
     /// <summary>Gets the access token lifetime.</summary>

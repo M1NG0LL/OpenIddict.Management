@@ -430,10 +430,10 @@ Working sample projects are available in the [samples/](samples/) directory:
 
 ## Target Framework
 
-- **.NET 10.0**
+- **.NET 8.0, .NET 9.0, .NET 10.0**
 - **C# latest** — primary constructors, collection expressions
-- **Entity Framework Core 10.x**
-- **OpenIddict 5.8.0**
+- **Entity Framework Core 8.x, 9.x, 10.x**
+- **OpenIddict 7.x** (7.7.1)
 
 ---
 

@@ -103,11 +103,17 @@ public class IndexModel(
     /// <summary>Gets token endpoint URIs.</summary>
     public IReadOnlyList<string> TokenEndpointUris { get; set; } = [];
 
-    /// <summary>Gets logout endpoint URIs.</summary>
-    public IReadOnlyList<string> LogoutEndpointUris { get; set; } = [];
+    /// <summary>Gets end session (logout) endpoint URIs.</summary>
+    public IReadOnlyList<string> EndSessionEndpointUris { get; set; } = [];
+
+    /// <summary>Gets logout endpoint URIs (legacy alias).</summary>
+    public IReadOnlyList<string> LogoutEndpointUris => EndSessionEndpointUris;
 
     /// <summary>Gets userinfo endpoint URIs.</summary>
-    public IReadOnlyList<string> UserinfoEndpointUris { get; set; } = [];
+    public IReadOnlyList<string> UserInfoEndpointUris { get; set; } = [];
+
+    /// <summary>Gets userinfo endpoint URIs (legacy alias).</summary>
+    public IReadOnlyList<string> UserinfoEndpointUris => UserInfoEndpointUris;
 
     /// <summary>Gets introspection endpoint URIs.</summary>
     public IReadOnlyList<string> IntrospectionEndpointUris { get; set; } = [];
@@ -115,14 +121,23 @@ public class IndexModel(
     /// <summary>Gets revocation endpoint URIs.</summary>
     public IReadOnlyList<string> RevocationEndpointUris { get; set; } = [];
 
-    /// <summary>Gets device endpoint URIs.</summary>
-    public IReadOnlyList<string> DeviceEndpointUris { get; set; } = [];
+    /// <summary>Gets device authorization endpoint URIs.</summary>
+    public IReadOnlyList<string> DeviceAuthorizationEndpointUris { get; set; } = [];
 
-    /// <summary>Gets verification endpoint URIs.</summary>
-    public IReadOnlyList<string> VerificationEndpointUris { get; set; } = [];
+    /// <summary>Gets device endpoint URIs (legacy alias).</summary>
+    public IReadOnlyList<string> DeviceEndpointUris => DeviceAuthorizationEndpointUris;
 
-    /// <summary>Gets cryptography endpoint URIs.</summary>
-    public IReadOnlyList<string> CryptographyEndpointUris { get; set; } = [];
+    /// <summary>Gets end user verification endpoint URIs.</summary>
+    public IReadOnlyList<string> EndUserVerificationEndpointUris { get; set; } = [];
+
+    /// <summary>Gets verification endpoint URIs (legacy alias).</summary>
+    public IReadOnlyList<string> VerificationEndpointUris => EndUserVerificationEndpointUris;
+
+    /// <summary>Gets JSON Web Key Set (cryptography) endpoint URIs.</summary>
+    public IReadOnlyList<string> JsonWebKeySetEndpointUris { get; set; } = [];
+
+    /// <summary>Gets cryptography endpoint URIs (legacy alias).</summary>
+    public IReadOnlyList<string> CryptographyEndpointUris => JsonWebKeySetEndpointUris;
 
     /// <summary>Gets configuration discovery endpoint URIs.</summary>
     public IReadOnlyList<string> ConfigurationEndpointUris { get; set; } = [];
@@ -314,19 +329,19 @@ public class IndexModel(
             // Endpoints
             AuthorizationEndpointUris = opt.AuthorizationEndpointUris.Select(u => u.OriginalString).ToList();
             TokenEndpointUris = opt.TokenEndpointUris.Select(u => u.OriginalString).ToList();
-            LogoutEndpointUris = opt.LogoutEndpointUris.Select(u => u.OriginalString).ToList();
-            UserinfoEndpointUris = opt.UserinfoEndpointUris.Select(u => u.OriginalString).ToList();
+            EndSessionEndpointUris = opt.EndSessionEndpointUris.Select(u => u.OriginalString).ToList();
+            UserInfoEndpointUris = opt.UserInfoEndpointUris.Select(u => u.OriginalString).ToList();
             IntrospectionEndpointUris = opt.IntrospectionEndpointUris.Select(u => u.OriginalString).ToList();
             RevocationEndpointUris = opt.RevocationEndpointUris.Select(u => u.OriginalString).ToList();
-            DeviceEndpointUris = opt.DeviceEndpointUris.Select(u => u.OriginalString).ToList();
-            VerificationEndpointUris = opt.VerificationEndpointUris.Select(u => u.OriginalString).ToList();
-            CryptographyEndpointUris = opt.CryptographyEndpointUris.Select(u => u.OriginalString).ToList();
+            DeviceAuthorizationEndpointUris = opt.DeviceAuthorizationEndpointUris.Select(u => u.OriginalString).ToList();
+            EndUserVerificationEndpointUris = opt.EndUserVerificationEndpointUris.Select(u => u.OriginalString).ToList();
+            JsonWebKeySetEndpointUris = opt.JsonWebKeySetEndpointUris.Select(u => u.OriginalString).ToList();
             ConfigurationEndpointUris = opt.ConfigurationEndpointUris.Select(u => u.OriginalString).ToList();
 
             var discoveryRelUri = ConfigurationEndpointUris.FirstOrDefault() ?? "/.well-known/openid-configuration";
             DiscoveryEndpointUrl = ResolveEndpointUrl(discoveryRelUri);
 
-            var jwksRelUri = CryptographyEndpointUris.FirstOrDefault() ?? "/.well-known/jwks";
+            var jwksRelUri = JsonWebKeySetEndpointUris.FirstOrDefault() ?? "/.well-known/jwks";
             JwksEndpointUrl = ResolveEndpointUrl(jwksRelUri);
 
             // Flows

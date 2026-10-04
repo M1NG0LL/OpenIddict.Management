@@ -233,7 +233,7 @@ public class ApplicationValidationHandlerTests
 
         var transaction = new OpenIddictServerTransaction();
         var request = new OpenIddictRequest { ClientId = "device-client" };
-        var context = new OpenIddictServerEvents.ValidateDeviceRequestContext(transaction)
+        var context = new OpenIddictServerEvents.ValidateDeviceAuthorizationRequestContext(transaction)
         {
             Request = request
         };
@@ -260,7 +260,7 @@ public class ApplicationValidationHandlerTests
 
         var transaction = new OpenIddictServerTransaction();
         var request = new OpenIddictRequest { ClientId = "disabled-device-client" };
-        var context = new OpenIddictServerEvents.ValidateDeviceRequestContext(transaction)
+        var context = new OpenIddictServerEvents.ValidateDeviceAuthorizationRequestContext(transaction)
         {
             Request = request
         };

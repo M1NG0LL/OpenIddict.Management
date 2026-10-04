@@ -92,14 +92,21 @@ public sealed class ConfigurationExportImportService(
                 Issuer = sOpt.Issuer?.OriginalString ?? sOpt.Issuer?.ToString(),
                 AuthorizationEndpointUris = sOpt.AuthorizationEndpointUris.Select(u => u.OriginalString).ToList(),
                 TokenEndpointUris = sOpt.TokenEndpointUris.Select(u => u.OriginalString).ToList(),
-                LogoutEndpointUris = sOpt.LogoutEndpointUris.Select(u => u.OriginalString).ToList(),
-                UserinfoEndpointUris = sOpt.UserinfoEndpointUris.Select(u => u.OriginalString).ToList(),
+                EndSessionEndpointUris = sOpt.EndSessionEndpointUris.Select(u => u.OriginalString).ToList(),
+                UserInfoEndpointUris = sOpt.UserInfoEndpointUris.Select(u => u.OriginalString).ToList(),
                 IntrospectionEndpointUris = sOpt.IntrospectionEndpointUris.Select(u => u.OriginalString).ToList(),
                 RevocationEndpointUris = sOpt.RevocationEndpointUris.Select(u => u.OriginalString).ToList(),
-                DeviceEndpointUris = sOpt.DeviceEndpointUris.Select(u => u.OriginalString).ToList(),
-                VerificationEndpointUris = sOpt.VerificationEndpointUris.Select(u => u.OriginalString).ToList(),
-                CryptographyEndpointUris = sOpt.CryptographyEndpointUris.Select(u => u.OriginalString).ToList(),
+                DeviceAuthorizationEndpointUris = sOpt.DeviceAuthorizationEndpointUris.Select(u => u.OriginalString).ToList(),
+                EndUserVerificationEndpointUris = sOpt.EndUserVerificationEndpointUris.Select(u => u.OriginalString).ToList(),
+                JsonWebKeySetEndpointUris = sOpt.JsonWebKeySetEndpointUris.Select(u => u.OriginalString).ToList(),
                 ConfigurationEndpointUris = sOpt.ConfigurationEndpointUris.Select(u => u.OriginalString).ToList(),
+#pragma warning disable CS0618 // Type or member is obsolete
+                LogoutEndpointUris = sOpt.EndSessionEndpointUris.Select(u => u.OriginalString).ToList(),
+                UserinfoEndpointUris = sOpt.UserInfoEndpointUris.Select(u => u.OriginalString).ToList(),
+                DeviceEndpointUris = sOpt.DeviceAuthorizationEndpointUris.Select(u => u.OriginalString).ToList(),
+                VerificationEndpointUris = sOpt.EndUserVerificationEndpointUris.Select(u => u.OriginalString).ToList(),
+                CryptographyEndpointUris = sOpt.JsonWebKeySetEndpointUris.Select(u => u.OriginalString).ToList(),
+#pragma warning restore CS0618
 
                 AccessTokenLifetime = sOpt.AccessTokenLifetime,
                 RefreshTokenLifetime = sOpt.RefreshTokenLifetime,
@@ -477,14 +484,16 @@ public sealed class ConfigurationExportImportService(
 
         ReplaceUris(target.AuthorizationEndpointUris, source.AuthorizationEndpointUris);
         ReplaceUris(target.TokenEndpointUris, source.TokenEndpointUris);
-        ReplaceUris(target.LogoutEndpointUris, source.LogoutEndpointUris);
-        ReplaceUris(target.UserinfoEndpointUris, source.UserinfoEndpointUris);
+#pragma warning disable CS0618 // Type or member is obsolete
+        ReplaceUris(target.EndSessionEndpointUris, source.EndSessionEndpointUris.Count > 0 ? source.EndSessionEndpointUris : source.LogoutEndpointUris);
+        ReplaceUris(target.UserInfoEndpointUris, source.UserInfoEndpointUris.Count > 0 ? source.UserInfoEndpointUris : source.UserinfoEndpointUris);
         ReplaceUris(target.IntrospectionEndpointUris, source.IntrospectionEndpointUris);
         ReplaceUris(target.RevocationEndpointUris, source.RevocationEndpointUris);
-        ReplaceUris(target.DeviceEndpointUris, source.DeviceEndpointUris);
-        ReplaceUris(target.VerificationEndpointUris, source.VerificationEndpointUris);
-        ReplaceUris(target.CryptographyEndpointUris, source.CryptographyEndpointUris);
+        ReplaceUris(target.DeviceAuthorizationEndpointUris, source.DeviceAuthorizationEndpointUris.Count > 0 ? source.DeviceAuthorizationEndpointUris : source.DeviceEndpointUris);
+        ReplaceUris(target.EndUserVerificationEndpointUris, source.EndUserVerificationEndpointUris.Count > 0 ? source.EndUserVerificationEndpointUris : source.VerificationEndpointUris);
+        ReplaceUris(target.JsonWebKeySetEndpointUris, source.JsonWebKeySetEndpointUris.Count > 0 ? source.JsonWebKeySetEndpointUris : source.CryptographyEndpointUris);
         ReplaceUris(target.ConfigurationEndpointUris, source.ConfigurationEndpointUris);
+#pragma warning restore CS0618
 
         target.AccessTokenLifetime = source.AccessTokenLifetime;
         target.RefreshTokenLifetime = source.RefreshTokenLifetime;
