@@ -57,7 +57,7 @@ public static class OpenIddictManagementEfCoreStoreExtensions
             {
                 options.UseEntityFrameworkCore()
                        .UseDbContext<TContext>()
-                       .ReplaceDefaultEntities<TKey>();
+                       .ReplaceDefaultEntities<ManagementApplication<TKey>, ManagementAuthorization<TKey>, ManagementScope<TKey>, ManagementToken<TKey>, TKey>();
 
                 options.SetDefaultApplicationEntity<ManagementApplication<TKey>>()
                        .SetDefaultAuthorizationEntity<ManagementAuthorization<TKey>>()

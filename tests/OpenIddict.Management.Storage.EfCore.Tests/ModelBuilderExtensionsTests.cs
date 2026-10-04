@@ -56,10 +56,10 @@ public class ModelBuilderExtensionsTests : IDisposable
             {
                 options.UseEntityFrameworkCore()
                        .UseDbContext<DummyDbContext>();
-                options.SetDefaultApplicationEntity(typeof(ManagementApplication<Guid>))
-                       .SetDefaultAuthorizationEntity(typeof(ManagementAuthorization<Guid>))
-                       .SetDefaultScopeEntity(typeof(ManagementScope<Guid>))
-                       .SetDefaultTokenEntity(typeof(ManagementToken<Guid>));
+                options.SetDefaultApplicationEntity<ManagementApplication<Guid>>()
+                       .SetDefaultAuthorizationEntity<ManagementAuthorization<Guid>>()
+                       .SetDefaultScopeEntity<ManagementScope<Guid>>()
+                       .SetDefaultTokenEntity<ManagementToken<Guid>>();
             });
 
         using var provider = services.BuildServiceProvider();

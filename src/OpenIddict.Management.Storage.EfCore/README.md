@@ -37,7 +37,7 @@ Install-Package Mingoll.OpenIddict.Management.Storage.EfCore
 ### Required Package Dependencies
 - [`Mingoll.OpenIddict.Management.Core`](../OpenIddict.Management.Core/README.md) (Abstractions, models, contracts, audit logging)
 - `OpenIddict.EntityFrameworkCore` (>= 6.x / 7.x)
-- `Microsoft.EntityFrameworkCore.Relational` (>= 8.x / 9.x)
+- `Microsoft.EntityFrameworkCore.Relational` (>= 8.x / 9.x / 10.x)
 
 ### Companion Database Providers
 You must reference your preferred EF Core database provider in your host application:

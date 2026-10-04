@@ -130,6 +130,7 @@ public class ConfigurationExportImportServiceTests
         serverOptions.Scopes.Add("api");
         serverOptions.Claims.Clear();
         serverOptions.Claims.Add("sub");
+        serverOptions.CodeChallengeMethods.Clear();
         serverOptions.CodeChallengeMethods.Add("S256");
 
         var managementOptions = new OpenIddictManagementOptions
@@ -207,7 +208,7 @@ public class ConfigurationExportImportServiceTests
                 Issuer = "https://imported.example.com/",
                 AuthorizationEndpointUris = ["/oauth/authorize"],
                 TokenEndpointUris = ["/oauth/token"],
-                LogoutEndpointUris = ["/oauth/logout"],
+                EndSessionEndpointUris = ["/oauth/logout"],
                 AccessTokenLifetime = TimeSpan.FromHours(2),
                 RefreshTokenLifetime = TimeSpan.FromDays(60),
                 GrantTypes = ["authorization_code", "client_credentials"],
@@ -253,7 +254,7 @@ public class ConfigurationExportImportServiceTests
         serverOptions.Issuer.Should().Be(new Uri("https://imported.example.com/"));
         serverOptions.AuthorizationEndpointUris.Select(u => u.OriginalString).Should().BeEquivalentTo(["/oauth/authorize"]);
         serverOptions.TokenEndpointUris.Select(u => u.OriginalString).Should().BeEquivalentTo(["/oauth/token"]);
-        serverOptions.LogoutEndpointUris.Select(u => u.OriginalString).Should().BeEquivalentTo(["/oauth/logout"]);
+        serverOptions.EndSessionEndpointUris.Select(u => u.OriginalString).Should().BeEquivalentTo(["/oauth/logout"]);
         serverOptions.AccessTokenLifetime.Should().Be(TimeSpan.FromHours(2));
         serverOptions.RefreshTokenLifetime.Should().Be(TimeSpan.FromDays(60));
         serverOptions.GrantTypes.Should().BeEquivalentTo(["authorization_code", "client_credentials"]);

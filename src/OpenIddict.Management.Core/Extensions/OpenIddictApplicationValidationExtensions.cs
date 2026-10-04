@@ -43,7 +43,7 @@ public static class OpenIddictApplicationValidationExtensions
             options.UseScopedHandler<OpenIddictApplicationValidationHandler>()
                    .SetOrder(OpenIddictApplicationValidationHandler.DefaultOrder));
 
-        serverBuilder.AddEventHandler<OpenIddictServerEvents.ValidateDeviceRequestContext>(options =>
+        serverBuilder.AddEventHandler<OpenIddictServerEvents.ValidateDeviceAuthorizationRequestContext>(options =>
             options.UseScopedHandler<OpenIddictApplicationValidationHandler>()
                    .SetOrder(OpenIddictApplicationValidationHandler.DefaultOrder));
 
@@ -84,7 +84,7 @@ public static class OpenIddictApplicationValidationExtensions
             options.UseScopedHandler<OpenIddictApplicationValidationHandler>()
                    .SetOrder(OpenIddictApplicationValidationHandler.DefaultOrder));
 
-        builder.AddEventHandler<OpenIddictServerEvents.ValidateDeviceRequestContext>(options =>
+        builder.AddEventHandler<OpenIddictServerEvents.ValidateDeviceAuthorizationRequestContext>(options =>
             options.UseScopedHandler<OpenIddictApplicationValidationHandler>()
                    .SetOrder(OpenIddictApplicationValidationHandler.DefaultOrder));
 

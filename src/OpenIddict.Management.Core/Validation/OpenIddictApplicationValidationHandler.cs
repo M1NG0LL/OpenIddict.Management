@@ -13,7 +13,7 @@ public class OpenIddictApplicationValidationHandler :
     IOpenIddictValidationHandler<OpenIddictValidationEvents.ProcessAuthenticationContext>,
     IOpenIddictServerHandler<OpenIddictServerEvents.ValidateTokenRequestContext>,
     IOpenIddictServerHandler<OpenIddictServerEvents.ValidateAuthorizationRequestContext>,
-    IOpenIddictServerHandler<OpenIddictServerEvents.ValidateDeviceRequestContext>
+    IOpenIddictServerHandler<OpenIddictServerEvents.ValidateDeviceAuthorizationRequestContext>
 {
     /// <summary>
     /// The default order in which this handler executes within the OpenIddict event pipeline.
@@ -84,7 +84,11 @@ public class OpenIddictApplicationValidationHandler :
             ClientId = clientId,
             EndpointType = "Token",
             GrantType = context.Request?.GrantType,
-            Principal = context.Principal,
+            Principal = context.AuthorizationCodePrincipal
+                ?? context.RefreshTokenPrincipal
+                ?? context.DeviceCodePrincipal
+                ?? context.SubjectTokenPrincipal
+                ?? context.ActorTokenPrincipal,
             CancellationToken = context.CancellationToken
         };
 
@@ -127,7 +131,7 @@ public class OpenIddictApplicationValidationHandler :
     }
 
     /// <inheritdoc/>
-    public virtual async ValueTask HandleAsync(OpenIddictServerEvents.ValidateDeviceRequestContext context)
+    public virtual async ValueTask HandleAsync(OpenIddictServerEvents.ValidateDeviceAuthorizationRequestContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
